@@ -245,7 +245,7 @@ type
     {$ifdef linux} IdleMessage : string; {$endif}
     function UnboundMemo: TUnboundMemo;
     function CheckFileSave: boolean;
-    function SelectBible(name: string): boolean;
+    function SelectBible(name: string; addHistory:boolean=false): boolean;
     procedure ComboBoxInit;
     procedure EnableActions;
     procedure UpDownButtons;
@@ -901,11 +901,8 @@ begin
   if Memo.hyperlink = '' then Exit;
 
   if Memo.Foreground = fgLink then
-    if SelectBible(Memo.hyperlink) then
-    begin
-      HistoryNew;
+    if SelectBible(Memo.hyperlink, true) then
       Exit;
-    end;
 
   if Memo.Foreground = fgLink then
       begin
@@ -973,7 +970,7 @@ begin
   PopupMenu.Popup(CursorPos.X, CursorPos.Y);
 end;
 
-function TMainForm.SelectBible(name: string): boolean;
+function TMainForm.SelectBible(name: string; addHistory: boolean): boolean;
 var i : integer;
 begin
   Result := False;
@@ -981,6 +978,8 @@ begin
   for i := 0 to ComboBox.Items.Count-1 do
     if ComboBox.Items[i] = name then
       begin
+        if addHistory then
+          HistoryNew;
         ComboBox.ItemIndex := i;
         ComboBoxChange(nil);
         Result := True;
@@ -1042,10 +1041,6 @@ begin
     apNotes:        memo := MemoNotes;
   end;
   History[I].Caret := memo.CaretPos;
-  with History[I] do begin
-    WriteLn(format('Bible=%d (''%s'')  Verse:%d %d:%d Page=%d Caret: %d,%d',
-      [Bible, Shelf[Bible].name, Verse.book, Verse.chapter, Verse.number, PageIndex, Caret.X, Caret.Y]));
-  end;
 end;
 
 procedure TMainForm.HistoryLoad;
@@ -1060,6 +1055,7 @@ begin
       Shelf.SetCurrent(History[HistoryIndex].Bible);
       MakeBookList;
       select := CurrVerse.number > 1;
+      ComboBox.ItemIndex := History[HistoryIndex].Bible;
     end else
       select := true;
     GotoVerse(History[HistoryIndex].Verse, select);
