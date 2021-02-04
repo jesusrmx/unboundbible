@@ -509,9 +509,9 @@ object MainForm: TMainForm
       object MemoNotes: TUnboundMemo
         Cursor = crArrow
         Left = 0
-        Height = 296
+        Height = 292
         Top = 0
-        Width = 729
+        Width = 731
         Align = alClient
         Font.Color = clWindowText
         Font.Height = -16
@@ -523,6 +523,7 @@ object MainForm: TMainForm
         ParentFont = False
         ScrollBars = ssBoth
         TabOrder = 0
+        WantTabs = True
         ZoomFactor = 1
         Linkable = True
       end
