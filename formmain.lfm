@@ -4,7 +4,7 @@ object MainForm: TMainForm
   Top = 203
   Width = 937
   Caption = 'Unbound Bible'
-  ClientHeight = 381
+  ClientHeight = 380
   ClientWidth = 937
   Constraints.MinHeight = 400
   Constraints.MinWidth = 600
@@ -253,11 +253,11 @@ object MainForm: TMainForm
   end
   object PanelLeft: TPanel
     Left = 0
-    Height = 326
+    Height = 328
     Top = 32
     Width = 195
     Align = alLeft
-    ClientHeight = 326
+    ClientHeight = 328
     ClientWidth = 195
     Font.CharSet = GREEK_CHARSET
     Font.Color = clWindowText
@@ -276,6 +276,7 @@ object MainForm: TMainForm
       ParentFont = False
       ScrollWidth = 132
       TabOrder = 0
+      TopIndex = -1
     end
     object ChapterBox: TListBox
       Left = 144
@@ -289,16 +290,17 @@ object MainForm: TMainForm
       ParentFont = False
       ScrollWidth = 43
       TabOrder = 1
+      TopIndex = -1
     end
     object ComboBox: TComboBox
       Left = 4
-      Height = 25
+      Height = 30
       Top = 2
       Width = 185
       DropDownCount = 12
       Font.Color = clWindowText
       Font.Height = -13
-      ItemHeight = 17
+      ItemHeight = 0
       OnChange = ComboBoxChange
       OnDrawItem = ComboBoxDrawItem
       ParentFont = False
@@ -308,8 +310,8 @@ object MainForm: TMainForm
   end
   object StatusBar: TStatusBar
     Left = 0
-    Height = 23
-    Top = 358
+    Height = 20
+    Top = 360
     Width = 937
     Panels = <>
     ParentShowHint = False
@@ -317,15 +319,15 @@ object MainForm: TMainForm
   end
   object PageControl: TPageControl
     Left = 200
-    Height = 326
+    Height = 328
     Top = 32
     Width = 737
-    ActivePage = TabSheetReference
+    ActivePage = TabSheetBible
     Align = alClient
     Font.Color = clWindowText
     Font.Height = -13
     ParentFont = False
-    TabIndex = 3
+    TabIndex = 0
     TabOrder = 2
     OnChange = PageControlChange
     object TabSheetBible: TTabSheet
@@ -420,14 +422,14 @@ object MainForm: TMainForm
     end
     object TabSheetReference: TTabSheet
       Caption = 'Сross-References'
-      ClientHeight = 296
-      ClientWidth = 729
+      ClientHeight = 292
+      ClientWidth = 731
       object MemoReference: TUnboundMemo
         Cursor = crArrow
         Left = 0
-        Height = 296
+        Height = 292
         Top = 0
-        Width = 729
+        Width = 731
         Align = alClient
         Font.Color = clWindowText
         Font.Height = -16
@@ -501,8 +503,8 @@ object MainForm: TMainForm
     end
     object TabSheetNotes: TTabSheet
       Caption = 'Notes'
-      ClientHeight = 296
-      ClientWidth = 729
+      ClientHeight = 292
+      ClientWidth = 731
       ImageIndex = 2
       object MemoNotes: TUnboundMemo
         Cursor = crArrow
@@ -528,7 +530,7 @@ object MainForm: TMainForm
   end
   object Splitter: TSplitter
     Left = 195
-    Height = 326
+    Height = 328
     Top = 32
     Width = 5
   end
