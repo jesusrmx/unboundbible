@@ -14,6 +14,8 @@ type
   { TMainForm }
 
   TMainForm = class(TForm)
+    ActionHistoryNext: TAction;
+    ActionHistoryPrev: TAction;
     ActionSearch: TAction;
     ActionLookup: TAction;
     ActionReference: TAction;
@@ -148,6 +150,9 @@ type
     pmSeparator2: TMenuItem;
 
     StandardToolBar: TToolBar;
+    ToolButton1: TToolButton;
+    ToolButton2: TToolButton;
+    ToolButton4: TToolButton;
     ToolButtonReference: TToolButton;
     ToolPanel: TPanel;
     ToolButtonBold: TToolButton;
@@ -180,6 +185,8 @@ type
     ToolSeparatorBullets: TToolButton;
     ToolButtonVerses: TToolButton;
 
+    procedure ActionHistoryNextExecute(Sender: TObject);
+    procedure ActionHistoryPrevExecute(Sender: TObject);
     procedure CmdReference(Sender: TObject);
     procedure CmdCommentaries(Sender: TObject);
     procedure CmdDictionaries(Sender: TObject);
@@ -244,6 +251,11 @@ type
     procedure UpDownButtons;
     procedure SelectBook(title: string; scroll: boolean);
     procedure GoToVerse(Verse: TVerse; select: boolean);
+    procedure HistoryAddCurrent;
+    procedure HistoryLoad;
+    procedure HistoryNew;
+    procedure HistoryUpdate;
+    procedure JumpToLink(Verse: TVerse);
     procedure LangMenuInit;
     procedure LoadChapter;
     procedure LoadSearch(s: string);
@@ -562,8 +574,8 @@ begin
                                else fp.Style := fp.Style + [fsUnderline];
 
   if Sender = ActionLink then
-    if fp.Color = clNavy then fp.Color := clBlack
-                         else fp.Color := clNavy;
+    if fp.Color = clSysLink then fp.Color := clBlack
+                            else fp.Color := clSysLink;
 
 //if Sender = ActionSuper then
 //  if fp.vScriptPos = vpSuperscript then fp.vScriptPos := vpNormal
@@ -722,6 +734,25 @@ begin
   LoadReference;
 end;
 
+procedure TMainForm.ActionHistoryPrevExecute(Sender: TObject);
+begin
+  if HistoryIndex=Length(History) then
+    HistoryAddCurrent;
+  if HistoryIndex>0 then
+    Dec(HistoryIndex);
+  HistoryLoad;
+  HistoryUpdate;
+end;
+
+procedure TMainForm.ActionHistoryNextExecute(Sender: TObject);
+begin
+  if HistoryIndex<Length(History)-1 then begin
+    Inc(HistoryIndex);
+    HistoryLoad;
+    HistoryUpdate;
+  end;
+end;
+
 procedure TMainForm.CmdCommentaries(Sender: TObject);
 begin
   LoadCommentary;
@@ -870,12 +901,16 @@ begin
   if Memo.hyperlink = '' then Exit;
 
   if Memo.Foreground = fgLink then
-    if SelectBible(Memo.hyperlink) then Exit;
+    if SelectBible(Memo.hyperlink) then
+    begin
+      HistoryNew;
+      Exit;
+    end;
 
   if Memo.Foreground = fgLink then
       begin
         Verse := CurrBible.SrtToVerse(Memo.hyperlink);
-        if Verse.Book > 0 then GoToVerse(Verse, True);
+        if Verse.Book > 0 then JumpToLink(Verse);
       end;
 
   if Memo = MemoBible then
@@ -985,6 +1020,84 @@ begin
 
   if select then MemoBible.SelectParagraph(Verse.Number);
   Repaint;
+end;
+
+procedure TMainForm.HistoryAddCurrent;
+var
+  I : Integer;
+  memo : TUnboundMemo;
+begin
+  I := HistoryIndex;
+  SetLength(History, I+1);
+  History[I].Bible := Shelf.Current;
+  History[I].Verse := CurrVerse;
+  History[I].PageIndex := PageControl.ActivePageIndex;
+  case History[I].PageIndex of
+    apBible:        memo := MemoBible;
+    apSearch:       memo := MemoSearch;
+    apCompare:      memo := MemoCompare;
+    apReferences:   memo := MemoReference;
+    apCommentaries: memo := MemoCommentary;
+    apDictionaries: memo := MemoDictionary;
+    apNotes:        memo := MemoNotes;
+  end;
+  History[I].Caret := memo.CaretPos;
+  with History[I] do begin
+    WriteLn(format('Bible=%d (''%s'')  Verse:%d %d:%d Page=%d Caret: %d,%d',
+      [Bible, Shelf[Bible].name, Verse.book, Verse.chapter, Verse.number, PageIndex, Caret.X, Caret.Y]));
+  end;
+end;
+
+procedure TMainForm.HistoryLoad;
+var
+  memo: TUnboundMemo;
+  select: Boolean;
+begin
+  if (HistoryIndex>=0) and (HistoryIndex<Length(History)) then
+  begin
+    if History[HistoryIndex].Bible<>Shelf.Current then
+    begin
+      Shelf.SetCurrent(History[HistoryIndex].Bible);
+      MakeBookList;
+      select := CurrVerse.number > 1;
+    end else
+      select := true;
+    GotoVerse(History[HistoryIndex].Verse, select);
+    SelectPage(History[HistoryIndex].PageIndex);
+    case History[HistoryIndex].PageIndex of
+      apBible:        memo := MemoBible;
+      apSearch:       memo := MemoSearch;
+      apCompare:      memo := MemoCompare;
+      apReferences:   memo := MemoReference;
+      apCommentaries: memo := MemoCommentary;
+      apDictionaries: memo := MemoDictionary;
+      apNotes:        memo := MemoNotes;
+    end;
+    memo.CaretPos := History[HistoryIndex].Caret;
+    memo.SetFocus;
+  end;
+end;
+
+procedure TMainForm.HistoryNew;
+begin
+  HistoryAddCurrent;
+  HistoryIndex := Length(History);
+  HistoryUpdate;
+end;
+
+procedure TMainForm.HistoryUpdate;
+var
+  L : Integer;
+begin
+  L := Length(History);
+  ActionHistoryPrev.Enabled := (L>0) and (HistoryIndex-1>=0) and (HistoryIndex-1<L);
+  ActionHistoryNext.Enabled := (L>0) and (HistoryIndex+1>=0) and (HistoryIndex+1<L);
+end;
+
+procedure TMainForm.JumpToLink(Verse: TVerse);
+begin
+  HistoryNew;
+  GoToVerse(Verse, true);
 end;
 
 function TMainForm.CheckFileSave: boolean;
@@ -1133,7 +1246,7 @@ begin
       ToolButtonBold.Down := fsBold in fp.Style;
       ToolButtonItalic.Down := fsItalic in fp.Style;
       ToolButtonUnderline.Down := fsUnderline in fp.Style;
-      ToolButtonLink.Down := clNavy = fp.Color;
+      ToolButtonLink.Down := clsysLink = fp.Color;
 
       case SelParaAlignment of
         paLeft: ToolButtonLeft.Down := True;
@@ -1578,6 +1691,8 @@ begin
   Options.cvGuillemets := IniFile.ReadBool('Options', 'Guillemets', False);
   Options.cvParentheses := IniFile.ReadBool('Options', 'Parentheses', False);
   Options.cvEnd := IniFile.ReadBool('Options', 'End', False);
+  clLink := StringToColorDef(IniFile.ReadString('Application', 'LinkColor', 'clNavy'), clNavy);
+  clLinkDark := StringToColorDef(IniFile.ReadString('Application', 'LinkDarkColor', '$FF9900'), TColor($FF9900));
   Max := IniFile.ReadInteger('Recent', 'Count', RecentList.Count);
 
   for i := 0 to Max - 1 do

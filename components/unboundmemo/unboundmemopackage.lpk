@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
-  <Package Version="4">
+  <Package Version="5">
     <PathDelim Value="\"/>
     <Name Value="unboundmemopackage"/>
     <Type Value="RunAndDesignTime"/>
@@ -12,6 +12,11 @@
         <OtherUnitFiles Value="win32"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
+      <Linking>
+        <Debugging>
+          <DebugInfoType Value="dsDwarf2"/>
+        </Debugging>
+      </Linking>
       <Other>
         <CompilerMessages>
           <IgnoredMessages idx6058="True" idx5093="True" idx5060="True" idx5058="True" idx5057="True" idx5037="True" idx4055="True"/>
@@ -59,6 +64,7 @@
         <UnitName Value="UnitLib"/>
       </Item8>
     </Files>
+    <CompatibilityMode Value="True"/>
     <RequiredPkgs Count="3">
       <Item1>
         <PackageName Value="richmemopackage"/>

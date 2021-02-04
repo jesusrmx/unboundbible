@@ -50,7 +50,7 @@ begin
   Result := true;
 
   if Tag = '<J>' then fp.Color := clSysMaroon else
-  if Tag = '<l>' then fp.Color := clSysNavy   else
+  if Tag = '<l>' then fp.Color := clSysLink   else
   if Tag = '<n>' then fp.Color := clSysGray   else
   if Tag = '<r>' then fp.Color := clSysRed    else
 

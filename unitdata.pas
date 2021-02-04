@@ -58,9 +58,24 @@ type
     cvAbbreviate, cvEnumerated, cvGuillemets, cvParentheses, cvEnd : boolean;
   end;
 
+  TGuiColors = record
+    Link, LinkDark: TColor;
+  end;
+
+  THistoryItem = record
+    Bible: Integer;
+    Verse: TVerse;
+    PageIndex: Integer;
+    TopPos: Integer;
+    Caret: TPoint;
+  end;
+
 var
   CurrVerse : TVerse;
   Options : TCopyOptions;
+  Colors : TGuiColors;
+  HistoryIndex: Integer = 0;
+  History: array of THistoryItem;
 
   TitlesArray : array [1..66] of string = (
     'Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth','1 Samuel','2 Samuel',

@@ -95,7 +95,7 @@ end;
 function TUnboundMemo.Foreground: integer;
 begin
   Result := fgText;
-  if SelAttributes.Color = clSysNavy  then Result := fgLink else
+  if SelAttributes.Color = clSysLink  then Result := fgLink else
   if SelAttributes.Color = clSysBrown then Result := fgStrong else
   if SelAttributes.Color = clSysTeal  then Result := fgFootnote;
 end;

@@ -51,7 +51,7 @@ begin
   if Tag =  '<J>' then begin r := '\cf7_'; jColor := true  end;
   if Tag = '</J>' then begin r := '\cf1_'; jColor := false end;
 
-  if Tag =  '<l>' then r := '\cf3_';
+  if Tag =  '<l>' then r := '\cf4_';
   if Tag = '</l>' then r := '\cf1_';
   if Tag =  '<r>' then r := '\cf2_';
   if Tag = '</r>' then r := '\cf1_';

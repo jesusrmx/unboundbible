@@ -80,6 +80,7 @@ function clSysBrown: TColor;
 function clSysMaroon: TColor;
 function clSysNavy: TColor;
 function clSysTeal: TColor;
+function clSysLink: TColor;
 
 // debug
 
@@ -94,6 +95,10 @@ const
   clGreenScreen = TColor($40B100);
   clSysGray = clGray;
   clSysRed = clRed;
+
+var
+  clLink : TColor = clNavy;
+  clLinkDark : TColor = TColor($FF9900);
 
 implementation
 
@@ -561,6 +566,11 @@ end;
 function clSysTeal: TColor;
 begin
   Result := iif(DarkTheme, TColor($CCCC66), clTeal);
+end;
+
+function clSysLink: TColor;
+begin
+  Result := iif(DarkTheme, clLinkDark, clLink);
 end;
 
 // debug

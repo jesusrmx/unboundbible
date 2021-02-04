@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="11"/>
+    <Version Value="12"/>
     <PathDelim Value="\"/>
     <General>
+      <Flags>
+        <CompatibilityMode Value="True"/>
+      </Flags>
       <SessionStorage Value="InIDEConfig"/>
-      <MainUnit Value="0"/>
       <Title Value="Unbound Bible"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
@@ -188,15 +190,9 @@
     </Parsing>
     <Linking>
       <Debugging>
-        <GenerateDebugInfo Value="False"/>
-        <DebugInfoType Value="dsStabs"/>
+        <DebugInfoType Value="dsDwarf2"/>
       </Debugging>
       <LinkSmart Value="True"/>
-      <Options>
-        <Win32>
-          <GraphicApplication Value="True"/>
-        </Win32>
-      </Options>
     </Linking>
     <Other>
       <CompilerMessages>
@@ -205,7 +201,7 @@
     </Other>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="5">
+    <Exceptions Count="6">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -221,6 +217,9 @@
       <Item5>
         <Name Value="EFCreateError"/>
       </Item5>
+      <Item6>
+        <Name Value="EDatabaseError"/>
+      </Item6>
     </Exceptions>
   </Debugging>
 </CONFIG>
