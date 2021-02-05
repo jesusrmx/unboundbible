@@ -14,6 +14,7 @@ type
   { TMainForm }
 
   TMainForm = class(TForm)
+    ActionInsVerse: TAction;
     ActionHistoryNext: TAction;
     ActionHistoryPrev: TAction;
     ActionSearch: TAction;
@@ -152,6 +153,7 @@ type
     StandardToolBar: TToolBar;
     ToolButton1: TToolButton;
     ToolButton2: TToolButton;
+    ToolButton3: TToolButton;
     ToolButton4: TToolButton;
     ToolButtonReference: TToolButton;
     ToolPanel: TPanel;
@@ -187,6 +189,7 @@ type
 
     procedure ActionHistoryNextExecute(Sender: TObject);
     procedure ActionHistoryPrevExecute(Sender: TObject);
+    procedure ActionInsVerseExecute(Sender: TObject);
     procedure CmdReference(Sender: TObject);
     procedure CmdCommentaries(Sender: TObject);
     procedure CmdDictionaries(Sender: TObject);
@@ -744,6 +747,21 @@ begin
   HistoryUpdate;
 end;
 
+procedure TMainForm.ActionInsVerseExecute(Sender: TObject);
+var
+  Verse: String;
+  List: TStringArray;
+  start: Integer;
+begin
+  List := CurrBible.GetRange(CurrVerse);
+  if Length(List)>0 then begin
+    Verse := CurrBible.VerseToStr(CurrVerse, true);
+    start := memoNotes.SelStart;
+    memoNotes.InDelText(Verse + #9 + List[0], Start, 0);
+    memoNotes.SetRangeColor(start, Length(Verse), clLink);
+  end;
+end;
+
 procedure TMainForm.ActionHistoryNextExecute(Sender: TObject);
 begin
   if HistoryIndex<Length(History)-1 then begin
@@ -1222,6 +1240,7 @@ begin
   ActionCenter.Enabled     := L;
   ActionRight.Enabled      := L;
   ActionBullets.Enabled    := L;
+  ActionInsVerse.Enabled   := L;
 
   ActionInterlinear.Enabled := B and not S and not M;
   ToolButtonSearch.Enabled  := PageControl.ActivePageIndex <> apDictionaries;
