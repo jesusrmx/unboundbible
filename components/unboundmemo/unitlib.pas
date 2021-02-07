@@ -134,7 +134,7 @@ end;
 function ToInt(s: string): integer;
 var v, r : integer;
 begin
-  s := Trim(s);
+  s := UTF8Trim(s);
   Val(s, v, r);
   if r=0 then Result := v else Result := 0;
 end;
