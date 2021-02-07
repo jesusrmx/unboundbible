@@ -12,6 +12,7 @@ const
   LangDirectory = 'localization';
   Untitled = 'Untitled';
   RecentMax = 10;
+  nbsp = UnitLib.nbsp;
 
 var
   ApplicationUpdate : boolean = false;

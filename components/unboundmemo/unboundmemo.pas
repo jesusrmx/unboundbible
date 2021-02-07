@@ -255,10 +255,17 @@ var
   i, x : integer;
   L : boolean;
 begin
-  L := False;
-  x := 0;
 
+  x := 0;
   i := 0;
+  if Search(nbsp + IntToStr(n), 0,  GetTextLen, [soWholeWord], i, x) then
+  begin
+    SelStart := i;
+    SelLength := 1;
+    exit;
+  end;
+
+  L := False;
   while True do
     begin
       SetSel(i,i);

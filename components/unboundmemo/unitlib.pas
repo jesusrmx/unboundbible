@@ -95,6 +95,11 @@ const
   clGreenScreen = TColor($40B100);
   clSysGray = clGray;
   clSysRed = clRed;
+  {$ifdef Linux}
+  nbsp = #194#160;
+  {$else}
+  nbsp = ' ';
+  {$endif}
 
 var
   clLink : TColor = clNavy;

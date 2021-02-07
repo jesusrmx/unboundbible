@@ -33,7 +33,7 @@ begin
   for i:=Low(Strings) to High(Strings) do
     begin
       text := Strings[i];
-      text := '<l> ' + ToStr(i+1) + '</l> ' + text + '<br>';
+      text := '<l>' + nbsp + ToStr(i+1) + '</l> ' + text + '<br>';
       Result += text;
     end;
 end;
