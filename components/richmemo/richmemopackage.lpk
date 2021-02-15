@@ -21,9 +21,11 @@
         <CompilerMessages>
           <IgnoredMessages idx5060="True" idx5057="True" idx5024="True" idx4055="True"/>
         </CompilerMessages>
-        <CustomOptions Value="-dRMLCLTRUNK"/>
-        <OtherDefines Count="1">
+        <CustomOptions Value="-dRMLCLTRUNK
+-dRMQT5_NOTEXTFORMATS"/>
+        <OtherDefines Count="2">
           <Define0 Value="RMLCLTRUNK"/>
+          <Define1 Value="RMQT5_NOTEXTFORMATS"/>
         </OtherDefines>
       </Other>
     </CompilerOptions>
