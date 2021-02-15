@@ -757,7 +757,7 @@ begin
   if Length(List)>0 then begin
     Verse := CurrBible.VerseToStr(CurrVerse, true);
     start := memoNotes.SelStart;
-    memoNotes.InDelText(Verse + #9 + List[0], Start, 0);
+    memoNotes.InDelText(Verse + #9 + List[0], start, memoNotes.SelLength);
     memoNotes.SetRangeColor(start, Length(Verse), clLink);
   end;
 end;
