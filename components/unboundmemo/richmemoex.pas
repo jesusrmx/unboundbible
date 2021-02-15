@@ -6,7 +6,7 @@ uses
   Forms, SysUtils, Classes, Graphics, Controls, ExtCtrls,
   {$ifdef windows} Windows, Printers, OSPrinters, {$endif}
   {$ifdef windows} RichEdit, rmWinEx, {$endif}
-  {$ifdef linux} rmGtk2ex, {$endif}
+  {$ifdef LCLGtk2} rmGtk2ex, {$endif}
   RichMemo, RichMemoUtils, LazUTF8, UnitLib;
 
 type
@@ -93,7 +93,7 @@ end;
 procedure TRichMemoEx.HideCursor;
 begin
    {$ifdef windows} HideCaret(Handle); {$endif}
-   {$ifdef linux} Gtk2HideCursor(Handle); {$endif}
+   {$ifdef LCLGtk2} Gtk2HideCursor(Handle); {$endif}
 end;
 
 procedure TRichMemoEx.Hide_Selection;
@@ -172,19 +172,19 @@ end;
 procedure TRichMemoEx.CopyToClipboard;
 begin
   inherited;
-  {$ifdef linux} Gtk2Copy(Handle); {$endif}
+  {$ifdef LCLGtk2} Gtk2Copy(Handle); {$endif}
 end;
 
 procedure TRichMemoEx.CutToClipboard;
 begin
   inherited;
-  {$ifdef linux} Gtk2Cut(Handle); {$endif}
+  {$ifdef LCLGtk2} Gtk2Cut(Handle); {$endif}
 end;
 
 procedure TRichMemoEx.PasteFromClipboard;
 begin
   inherited;
-  {$ifdef linux} Gtk2Paste(Handle); {$endif}
+  {$ifdef LCLGtk2} Gtk2Paste(Handle); {$endif}
 end;
 
 function TRichMemoEx.LoadRichText(Source: TStream): Boolean;
