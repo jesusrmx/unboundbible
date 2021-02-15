@@ -34,6 +34,9 @@ type
     class procedure SetTextAttributes(const AWinControl: TWinControl; TextStart, TextLen: Integer;
       const Params: TIntFontParams); override;
 
+    class function GetParaRange(const AWinControl: TWinControl; TextStart: Integer; var rng: TParaRange): Boolean; override;
+    class procedure InDelText(const AWinControl: TWinControl; const TextUTF8: String; DstStart, DstLen: Integer); override;
+
     class function Search(const AWinControl: TWinControl; const ANiddle: string; const SearchOpts: TIntSearchOpt): Integer; override;
 
     class function isInternalChange(const AWinControl: TWinControl; Params: TTextModifyMask
@@ -90,6 +93,7 @@ begin
   QtTextEdit.setScrollStyle(TCustomMemo(AWinControl).ScrollBars);
   QtTextEdit.setTabChangesFocus(not TCustomMemo(AWinControl).WantTabs);
   QtTextEdit.AttachEvents;
+  QTextEdit_setTabStopWidth(QTextEditH(QtTextEdit.Widget), 55);
 
   Result := TLCLIntfHandle(QtTextEdit);
 end;
@@ -143,7 +147,12 @@ begin
 
   MakeBackup(te, bck);
 
-  te.setSelection(TextStart, 1);
+  // If selstart is at the end of the line (before the EOL char) and we set Len=1
+  // it would move the cursor at the begining of the next block which would make
+  // that the retrieved attibutes do not match the previous block attributes
+  // (the expected behaviour) but the attributes of the next block which is wrong
+  //te.setSelection(TextStart, 1);
+  te.setSelection(TextStart, 0);
 
   //todo!
   ws:='';
@@ -216,6 +225,63 @@ begin
   }
 
   te.setSelection(ss, sl);
+end;
+
+class function TQtWSCustomRichMemo.GetParaRange(const AWinControl: TWinControl;
+  TextStart: Integer; var rng: TParaRange): Boolean;
+var
+  te : TQtTextEdit;
+  tc : QTextCursorH;
+begin
+  result := false;
+  rng.start := TextStart;
+  rng.length := 0;
+  rng.lengthNoBr := 0;
+
+  if not WSCheckHandleAllocated(AWinControl, 'GetParaRange') then
+    Exit;
+
+  te:=TQtTextEdit(AWinControl.Handle);
+
+  tc := QTextCursor_create();
+  QTextEdit_textCursor(QTextEditH(te.Widget), tc);
+
+  QTextCursor_setPosition(tc, TextStart);
+  QTextCursor_movePosition(tc, QTextCursorStartOfBlock);
+  rng.start:= QTextCursor_Position(tc);
+  if QTextCursor_movePosition(tc, QTextCursorEndOfBlock) then
+  begin
+    rng.lengthNoBr := QTextCursor_position(tc) -  rng.start;
+    if QTextCursor_movePosition(tc, QTextCursorNextCharacter) then
+      rng.length := QTextCursor_position(tc) -  rng.start
+    else
+      rng.length := rng.lengthNoBr;
+  end;
+
+  QTextCursor_destroy(tc);
+  result := true;
+end;
+
+class procedure TQtWSCustomRichMemo.InDelText(const AWinControl: TWinControl;
+  const TextUTF8: String; DstStart, DstLen: Integer);
+var
+  te: TQtTextEdit;
+  w: QTextEditH;
+  tc: QTextCursorH;
+  AText: UnicodeString;
+begin
+  if not WSCheckHandleAllocated(AWinControl, 'InDelText') then
+    Exit;
+  te:=TQtTextEdit(AWinControl.Handle);
+  w:=QTextEditH(te.Widget);
+  tc := QTextCursor_create();
+  QTextEdit_textCursor(w, tc);
+  QTextCursor_setPosition(tc, DstStart);
+  QTextCursor_setPosition(tc, DstStart + DstLen, QTextCursorKeepAnchor);
+  QTextCursor_removeSelectedText(tc);
+  AText := UTF8Decode(TextUTF8);
+  QTextCursor_insertText(tc, @AText);
+  QTextCursor_Destroy(tc);
 end;
 
 class function TQtWSCustomRichMemo.Search(const AWinControl: TWinControl;
