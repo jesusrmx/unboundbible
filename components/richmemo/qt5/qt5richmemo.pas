@@ -19,6 +19,17 @@ uses
   RichMemo, WSRichMemo;
 
 type
+  TCustomRichMemoInt   = class(TCustomRichMemo);
+
+  { TQtRichTextEdit }
+
+  TQtRichTextEdit = class(TQtTextEdit)
+  private
+    anchor: Widestring;
+  public
+    function SlotMouse(Sender: QObjectH; Event: QEventH): Boolean; override; cdecl;
+  end;
+
   { TQtWSCustomRichMemo }
 
   TQtWSCustomRichMemo = class(TWSCustomRichMemo)
@@ -36,6 +47,8 @@ type
 
     class function GetParaRange(const AWinControl: TWinControl; TextStart: Integer; var rng: TParaRange): Boolean; override;
     class procedure InDelText(const AWinControl: TWinControl; const TextUTF8: String; DstStart, DstLen: Integer); override;
+    class procedure SetTextUIParams(const AWinControl: TWinControl; TextStart, TextLen: Integer; const ui: TTextUIParam); override;
+    class function GetTextUIParams(const AWinControl: TWinControl; TextStart: Integer; var ui: TTextUIParam): Boolean; override;
 
     class function Search(const AWinControl: TWinControl; const ANiddle: string; const SearchOpts: TIntSearchOpt): Integer; override;
 
@@ -75,14 +88,148 @@ const
     QtAlignJustify
   );
 
+
+function QBrushToColor(brush: QBrushH): TQColor;
+var
+  aColor: PQColor;
+begin
+  aColor := QBrush_color(brush);
+  if aColor<>nil then result := aColor^
+  else                fillChar(result, sizeOf(TQColor), 0);
+end;
+
+function SameColor(A, B: TQColor): boolean;
+begin
+  result := (a.r=b.r) and (a.g=b.g) and (a.b=b.b) and (a.Alpha=b.Alpha) and
+            (a.ColorSpec=b.ColorSpec);
+end;
+
+function PrivateGetFormatRange(cursor: QTextCursorH; const start: Integer;
+  out rangeStart, rangeEnd: Integer): boolean;
+var
+  fmtRef, fmtCur: QTextCharFormatH;
+  refIsAnchor: Boolean;
+  refHRef, refFont: WideString;
+  font: QFontH;
+  refForeColor, refBackColor: TQColor;
+  brush: QBrushH;
+
+  function SameFormats: boolean;
+  var
+    tmpStr: wideString;
+    aColor: TQColor;
+  begin
+    // deal with hyperlinks
+    result := QTextCharFormat_isAnchor(fmtCur)=refIsAnchor;
+    if not result then exit;
+    if refIsAnchor then begin
+      QTextCharFormat_anchorHref(fmtCur, @tmpStr);
+      result := tmpStr=refHRef;
+      exit;
+    end;
+    // colors
+    QTextFormat_foreground(QTextFormatH(fmtCur), brush);
+    result := SameColor(QBrushToColor(brush), refForeColor);
+    if not result then exit;
+    // deal with formats
+    QTextCharFormat_font(fmtCur, font);
+    QFont_toString(font, @tmpStr);
+    result := tmpStr=refFont;
+  end;
+
+begin
+  result := false;
+  QTextCursor_setPosition(cursor, start );
+
+  fmtRef := QTextCharFormat_Create();
+  fmtCur := QTextCharFormat_Create();
+
+  rangeStart := QTextCursor_Position(cursor);
+  rangeEnd   := rangeStart;
+
+  QTextCursor_charFormat(cursor, fmtRef);
+
+  QTextCharFormat_anchorHref(fmtRef, @refHRef);
+  refIsAnchor := QTextCharFormat_isAnchor(fmtRef);
+  if not refIsAnchor then begin
+    font := QFont_Create();
+    brush := QBrush_Create();
+    QTextCharFormat_font(fmtRef, font);
+    QFont_toString(font, @refFont);
+
+    QTextFormat_foreground(QTextFormatH(fmtRef), brush);
+    refForeColor := QBrushToColor(brush);
+  end;
+
+  // find left limit
+  while QTextCursor_movePosition(cursor, QTextCursorPreviousCharacter) do begin
+    dec(rangeStart);
+    QTextCursor_charFormat(cursor, fmtCur);
+    if not SameFormats then
+      break;
+  end;
+
+  QTextCursor_setPosition(cursor, rangeEnd);
+  while QTextCursor_movePosition(cursor, QTextCursorNextCharacter) do begin
+    QTextCursor_charFormat(cursor, fmtCur);
+    if not SameFormats then
+      break;
+    inc(rangeEnd);
+  end;
+
+  if not refIsAnchor then begin
+    QFont_Destroy(font);
+    QBrush_Destroy(brush);
+  end;
+  QTextCharFormat_Destroy(fmtRef);
+  QTextCharFormat_Destroy(fmtCur);
+
+  result := true;
+end;
+
+{ TQtRichTextEdit }
+
+function TQtRichTextEdit.SlotMouse(Sender: QObjectH; Event: QEventH): Boolean;
+  cdecl;
+var
+  Pos: TQtPoint;
+  tc: QTextCursorH;
+  rangeStart, rangeEnd: Integer;
+  mi: TLinkMouseInfo;
+begin
+  if (LCLObject is TCustomRichMemo) then begin
+    QMouseEvent_pos(QMouseEventH(Event), @Pos);
+    case QEvent_type(Event) of
+      QEventMouseButtonPress:
+        begin
+          Anchor := '';
+          QTextEdit_anchorAt(QTextEditH(widget), @Anchor, @Pos);
+        end;
+      QEventMouseButtonRelease:
+        if Anchor<>'' then begin
+          tc := QTextCursor_Create();
+          QTextEdit_cursorForPosition(QTextEditH(widget), tc, @pos);
+          rangeStart := QTextCursor_position(tc);
+          mi.LinkRef:=UTF8Encode(Anchor);
+          mi.Button:=mbLeft;
+          if PrivateGetFormatRange(tc, rangeStart, rangeStart, rangeEnd) then
+            TCustomRichMemoInt(LCLObject).doLinkACtion(laClick, mi, rangeStart, rangeEnd);
+          QTextCursor_Destroy(tc);
+          Anchor := '';
+        end;
+    end;
+  end;
+  Result:=inherited SlotMouse(Sender, Event);
+end;
+
 { TQtWSCustomRichMemo }
 
 class function TQtWSCustomRichMemo.CreateHandle(const AWinControl: TWinControl;
   const AParams: TCreateParams): HWND;
 var
-  QtTextEdit: TQtTextEdit;
+  QtTextEdit: TQtRichTextEdit;
 begin
-  QtTextEdit := TQtTextEdit.Create(AWinControl, AParams);
+  QtTextEdit := TQtRichTextEdit.Create(AWinControl, AParams);
   QtTextEdit.AcceptRichText := True;
   QtTextEdit.ClearText;
   QtTextEdit.setBorder(TCustomMemo(AWinControl).BorderStyle = bsSingle);
@@ -284,6 +431,79 @@ begin
   QTextCursor_Destroy(tc);
 end;
 
+class procedure TQtWSCustomRichMemo.SetTextUIParams(
+  const AWinControl: TWinControl; TextStart, TextLen: Integer;
+  const ui: TTextUIParam);
+var
+  te: TQtTextEdit;
+  w: QTextEditH;
+  tc: QTextCursorH;
+  address: UnicodeString;
+  fmt: QTextCharFormatH;
+  Color: TQColor;
+  Brush: QBrushH;
+begin
+  if not WSCheckHandleAllocated(AWinControl, 'SetTextUIParams') then
+    Exit;
+  te:=TQtTextEdit(AWinControl.Handle);
+  w:=QTextEditH(te.Widget);
+  tc := QTextCursor_create();
+  QTextEdit_textCursor(w, tc);
+
+  fmt := QTextCharFormat_Create();
+  QTextCursor_charFormat(tc, fmt);
+
+  ColorRefToTQColor(ColorToRGB(clGreen), Color);
+  Brush := QBrush_create(@Color, QtSolidPattern);
+  QTextFormat_setForeground(QTextFormatH(fmt), brush);
+  QBrush_Destroy(Brush);
+  QTextCharFormat_setAnchor(fmt, true);
+  address := UTF8Decode(ui.linkref);
+  QTextCharFormat_setAnchorHref(fmt, @address);
+
+  QTextCursor_setPosition(tc, TextStart);
+  QTextCursor_setPosition(tc, TextStart + TextLen, QTextCursorKeepAnchor);
+  QTextCursor_setCharFormat(tc, fmt);
+
+  QTextCharFormat_Destroy(fmt);
+  QTextCursor_Destroy(tc);
+end;
+
+class function TQtWSCustomRichMemo.GetTextUIParams(
+  const AWinControl: TWinControl; TextStart: Integer; var ui: TTextUIParam
+  ): Boolean;
+var
+  te: TQtTextEdit;
+  w: QTextEditH;
+  tc: QTextCursorH;
+  address: UnicodeString;
+  fmt: QTextCharFormatH;
+  Color: TQColor;
+  Brush: QBrushH;
+begin
+  result := false;
+  if not WSCheckHandleAllocated(AWinControl, 'SetTextUIParams') then
+    Exit;
+
+  te:=TQtTextEdit(AWinControl.Handle);
+  w:=QTextEditH(te.Widget);
+  tc := QTextCursor_create();
+  QTextEdit_textCursor(w, tc);
+  QTextCursor_setPosition(tc, TextStart);
+
+  fmt := QTextCharFormat_Create();
+  QTextCursor_charFormat(tc, fmt);
+  if QTextCharFormat_isAnchor(fmt) then
+  begin
+    QTextCharFormat_anchorHref(fmt, @address);
+    ui.linkref := UTF8Encode(address);
+    result := true;
+  end;
+  QTextCharFormat_Destroy(fmt);
+
+  QTextCursor_Destroy(tc);
+end;
+
 class function TQtWSCustomRichMemo.Search(const AWinControl: TWinControl;
   const ANiddle: string; const SearchOpts: TIntSearchOpt): Integer;
 var
@@ -327,32 +547,40 @@ class function TQtWSCustomRichMemo.GetStyleRange(
   const AWinControl: TWinControl; TextStart: Integer; var RangeStart,
   RangeLen: Integer): Boolean;
 var
+  qcur : QTextCursorH;
   te : TQtTextEdit;
+  {$ifdef RMQT5_TEXTFORMATS}
   bck : TEditorState;
   al : QtAlignment;
-  qcur : QTextCursorH;
   qblck : QTextBlockH;
   qbfmt : QTextBlockFormatH;
   i   : integer;
   cnt : integer;
   rng : array of TTextRange;
   blckofs: integer;
+  {$endif}
 begin
   if not WSCheckHandleAllocated(AWinControl, 'GetStyleRange') then begin
     Result:=false;
     Exit;
   end;
 
-  RangeStart:=TextStart;
-  RangeLen:=1;
-  Result:=true;
-  {$ifndef RMQT5_TEXTFORMATS}
-  Exit;
-  {$else}
   te:=TQtTextEdit(AWinControl.Handle);
-
-  MakeBackup(te, bck);
   qcur := QTextCursor_Create();
+
+  {$ifndef RMQT5_TEXTFORMATS}
+  QTextEdit_textCursor(QTextEditH(te.Widget), qcur);
+  result := PrivateGetFormatRange(qCur, TextStart, RangeStart, RangeLen);
+  if result then
+    RangeLen := RangeLen - RangeStart
+  else begin
+    RangeStart:=TextStart;
+    RangeLen:=1;
+    Result:=true;
+  end;
+  QTextCursor_Destroy(qcur);
+  {$else}
+  MakeBackup(te, bck);
   qblck := QTextBlock_Create();
   try
     te.setSelection(TextStart, 0);
