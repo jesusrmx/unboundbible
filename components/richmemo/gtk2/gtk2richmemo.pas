@@ -1115,6 +1115,7 @@ var
   h      : double;
   fl     : double;
   t      : double;
+  ls     : double;
   attr   : PGtkTextAttributes;
   fp     : TFontParams;
 const
@@ -1134,6 +1135,10 @@ begin
   end else
     fl:=fl-h;
 
+  ls := AMetric.LineSpacing;
+  if ls<DefLineSpacing then
+    ls := DefLineSpacing;
+
   GetAttributesAt(AWinControl, TextStart, true, attr, fp);
   gtk_text_attributes_unref(attr);
 
@@ -1149,7 +1154,7 @@ begin
       'right-margin-set',       gboolean(gTRUE),
       'indent',                 gint(round(fl*DPIFactor)),
       'indent-set',             gboolean(gTRUE),
-      'pixels-inside-wrap',     gint((round(fp.Size*(AMetric.LineSpacing-DefLineSpacing)*DPIFactor))),
+      'pixels-inside-wrap',     gint((round(fp.Size*(ls-DefLineSpacing)*DPIFactor))),
       'pixels-inside_wrap-set', gboolean(gTRUE),
       nil]);
   ApplyTag(buffer, tag, TextStart, TextLen, true);
