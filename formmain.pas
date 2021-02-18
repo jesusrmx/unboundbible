@@ -246,10 +246,13 @@ type
     Statuses: TStatuses;
     PatreonVisited: boolean;
     {$ifdef linux} IdleMessage : string; {$endif}
+    procedure MemoNotesLinkAction(Sender: TObject; ALinkAction: TLinkAction;
+      const info: TLinkMouseInfo; LinkStart, LinkLen: Integer);
     function UnboundMemo: TUnboundMemo;
     function CheckFileSave: boolean;
     function SelectBible(name: string; addHistory:boolean=false): boolean;
     procedure ComboBoxInit;
+    function  CurrVerseToLink: string;
     procedure EnableActions;
     procedure UpDownButtons;
     procedure SelectBook(title: string; scroll: boolean);
@@ -370,6 +373,8 @@ begin
   {$endif}
 
   UpdateActionImage;
+
+  MemoNotes.OnLinkAction:=MemoNotesLinkAction;
 end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
@@ -758,7 +763,8 @@ begin
     Verse := CurrBible.VerseToStr(CurrVerse, true);
     start := memoNotes.SelStart;
     memoNotes.InDelText(Verse + #9 + List[0], start, memoNotes.SelLength);
-    memoNotes.SetRangeColor(start, Length(Verse), clLink);
+    memoNotes.SetLink(start, Length(Verse), true, CurrVerseToLink);
+    //memoNotes.SetRangeColor(start, Length(Verse), clLink);
   end;
 end;
 
@@ -958,6 +964,16 @@ begin
       ComboBox.Items.Add(Shelf[i].Name);
       if i = Shelf.Current then ComboBox.ItemIndex := i;
     end;
+end;
+
+function TMainForm.CurrVerseToLink: string;
+var
+  verse: String;
+begin
+  verse := CurrBible.VerseToStr(CurrVerse, true);
+  with CurrVerse do
+    result := format('unbound://%s/id?book=%.2d&chapter=%.2d&verse=%.2d&count=%.2d&bible=%s',
+    [verse, book, chapter, number, count, CurrBible.name]);
 end;
 
 procedure TMainForm.UpdateCaption(s: string);
@@ -1206,6 +1222,20 @@ begin
     else
       Result := nil;
   end;
+end;
+
+procedure TMainForm.MemoNotesLinkAction(Sender: TObject;
+  ALinkAction: TLinkAction; const info: TLinkMouseInfo; LinkStart,
+  LinkLen: Integer);
+var
+  s: string;
+begin
+  WriteStr(s, Info.Button);
+  WriteLn('LinkAction:');
+  WriteLn('  Button=', s);
+  WriteLn('  LinkRef=', Info.LinkRef);
+  WriteLn('  LinkStart=', LinkStart);
+  WriteLn('  LinkLen=', LinkLen);
 end;
 
 procedure TMainForm.EnableActions;
