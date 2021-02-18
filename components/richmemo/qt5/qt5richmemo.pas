@@ -213,7 +213,7 @@ begin
           mi.LinkRef:=UTF8Encode(Anchor);
           mi.Button:=mbLeft;
           if PrivateGetFormatRange(tc, rangeStart, rangeStart, rangeEnd) then
-            TCustomRichMemoInt(LCLObject).doLinkACtion(laClick, mi, rangeStart, rangeEnd);
+            TCustomRichMemoInt(LCLObject).doLinkACtion(laClick, mi, rangeStart, rangeEnd-rangeStart);
           QTextCursor_Destroy(tc);
           Anchor := '';
         end;
