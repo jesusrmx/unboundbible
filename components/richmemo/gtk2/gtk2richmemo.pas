@@ -40,7 +40,7 @@ uses
 const
   TagNameNumeric = 'numeric';
   TagNameSubOrSuper = 'suborsuper';
-  TagNameLink       = 'link';
+  TagNameLink       = 'linkref';
   BulletChar     = #$E2#$80#$A2;
   TabChar        = #$09;
 
@@ -176,7 +176,60 @@ type
 var
   linkCursor: PGdkCursor = nil;// gdk_cursor_new(GDK_DRAFT_LARGE)
 
-// todo: why "shr" on each of this flag test?
+function gtk_text_buffer_get_linkref_tag_at_offset(buffer: PGtkTextBuffer;
+  offset: Integer): PGtkTextTag;
+var
+  iter: TGtkTextIter;
+  tags, tagItem: PGSList;
+  data: pointer;
+begin
+  result := nil;
+
+  gtk_text_buffer_get_iter_at_offset (buffer, @iter, offset);
+  tags := gtk_text_iter_get_tags(@iter);
+
+  tagItem := tags;
+  while (tagItem<>nil) do begin
+    data := g_object_get_data(G_OBJECT(tagItem^.data), TagNameLink);
+    if data<>nil then begin
+      result := PGtkTextTag(tagItem^.data);
+      break;
+    end;
+    tagItem := tagItem^.next;
+  end;
+
+  if tags<>nil then
+    g_slist_free(tags);
+end;
+
+
+function gtk_texttag_linkref(tag: PGtkTextTag): string;
+var
+  data: pointer;
+begin
+  data := g_object_get_data(G_OBJECT(tag), TagNameLink);
+  if data<>nil then
+    result := pchar(data)
+  else
+    result := '';
+end;
+
+procedure gtk_texttag_free_linkref(tag:PGtkTextTag; data:gpointer); cdecl;
+begin
+  data := g_object_get_data(G_OBJECT(tag), TagNameLink);
+  if data<>nil then
+    StrDispose(pchar(data));
+end;
+
+procedure gtk_text_buffer_free_linkref_tags(buffer: PGtkTextBuffer);
+var
+  table: PGtkTextTagTable;
+begin
+  table := gtk_text_buffer_get_tag_table(buffer);
+  gtk_text_tag_table_foreach (table, @gtk_texttag_free_linkref, nil)
+end;
+
+  // todo: why "shr" on each of this flag test?
 function gtktextattr_underline(const a : TGtkTextAppearance) : Boolean;
 begin
   Result:=((a.flag0 and bm_TGtkTextAppearance_underline) shr bp_TGtkTextAppearance_underline) > 0;
@@ -405,13 +458,10 @@ var
   buf : PGtkTextBuffer;
   w   : PGdkWindow;
   bx,by: gint;
+  offset: gint;
 begin
   buf:=gtk_text_view_get_buffer(view);
   if not Assigned(buf) then Exit;
-
-  tag := gtk_text_tag_table_lookup(
-           gtk_text_buffer_get_tag_table(buf), TagNameLink);
-  if not Assigned(tag) then Exit; // which is odd.
 
   mt:=PGdkEventMotion(Event);
   gtk_text_view_window_to_buffer_coords(view, GTK_TEXT_WINDOW_TEXT,
@@ -419,10 +469,12 @@ begin
 
   gtk_text_view_get_iter_at_location(view, @i, bx,by);
 
+  offset := gtk_text_iter_get_offset(@i);
+  tag := gtk_text_buffer_get_linkref_tag_at_offset(buf, offset);
+
   gdk_cursor_new(GDK_DRAFT_LARGE);
   w:= gtk_text_view_get_window(view, GTK_TEXT_WINDOW_TEXT);
-  if gtk_text_iter_has_tag(@i,tag) then begin
-
+  if tag<>nil then begin
     if not Assigned(linkCursor) then
       linkCursor:=gdk_cursor_new(GDK_HAND1);
     gdk_window_set_cursor(w, linkCursor);
@@ -439,7 +491,7 @@ var
   i  : TGtkTextIter;
   tag : PGtkTextTag;
   buf : PGtkTextBuffer;
-  bx,by: gint;
+  bx,by,offset: gint;
   mi  : TLinkMouseInfo;
   li,le: integer;
   act : TLinkAction;
@@ -449,17 +501,15 @@ begin
   data:=PRichMemoData(WidgetInfo^.UserData);
   if not Assigned(buf) then Exit;
 
-  tag := gtk_text_tag_table_lookup(
-           gtk_text_buffer_get_tag_table(buf), TagNameLink);
-  if not Assigned(tag) then Exit; // which is odd.
-
   mt:=PGdkEventButton(Event);
   gtk_text_view_window_to_buffer_coords(view, GTK_TEXT_WINDOW_TEXT,
     round(mt^.x), round(mt^.y), @bx, @by);
 
   gtk_text_view_get_iter_at_location(view, @i, bx,by);
+  offset := gtk_text_iter_get_offset(@i);
+  tag := gtk_text_buffer_get_linkref_tag_at_offset(buf, offset);
 
-  if gtk_text_iter_has_tag(@i,tag) then begin
+  if tag<>nil then begin
     if TControl(WidgetInfo^.LCLObject) is TCustomRichMemo then
     begin
       gtk_text_iter_backward_to_tag_toggle(@i, tag);
@@ -487,6 +537,7 @@ begin
             else
               mi.button:=mbLeft;
             end;
+            mi.LinkRef := gtk_texttag_linkref(tag);
             TCustomRichMemoInt(WidgetInfo^.LCLObject).DoLinkAction(act, mi, li, le);
           end;
         end;
@@ -754,7 +805,6 @@ var
   WidgetInfo: PWidgetInfo;
   buffer: PGtkTextBuffer;
   SS:TPoint;
-  gcolor  : TGdkColor;
   data: PRichMemoData;
 const
   pu: array [Boolean] of gint = (PANGO_UNDERLINE_NONE, PANGO_UNDERLINE_SINGLE);
@@ -812,13 +862,6 @@ begin
 
   gtk_text_buffer_create_tag (buffer, TagNameSubOrSuper, nil);
 
-  gcolor := TColortoTGDKColor(clBlue);
-  gtk_text_buffer_create_tag (buffer, TagNameLink, 'foreground-gdk', [@gcolor,
-      'foreground-set', gboolean(gTRUE),
-      'underline-set',  gboolean(gTRUE),
-      'underline',      gint(pu[true]),
-      nil] );
-
   Set_RC_Name(AWinControl, Widget);
   SetCallbacks(Widget, WidgetInfo);
 end;
@@ -838,6 +881,9 @@ begin
     , 0, 0, nil
     , @Gtk2WS_MemoSelChanged, GetWidgetInfo(w));
   g_signal_handler_disconnect (b, handlerid);
+
+  // free linkref tags memory
+  gtk_text_buffer_free_linkref_tags(b);
 
   // the proper way of destroying a widgetset
   Gtk2WidgetSet.DestroyLCLComponent(AWinControl);
@@ -1348,9 +1394,10 @@ class procedure TGtk2WSCustomRichMemo.SetTextUIParams(
 var
   TextWidget: PGtkWidget;
   buffer  : PGtkTextBuffer;
-  tag     : Pointer;
-  istart : TGtkTextIter;
-  iend   : TGtkTextIter;
+  tag     : PGtkTextTag;
+  istart  : TGtkTextIter;
+  iend    : TGtkTextIter;
+  gcolor  : TGdkColor;
 begin
   GetWidgetBuffer(AWinControl, TextWidget, buffer);
   if not Assigned(buffer) then Exit;
@@ -1358,10 +1405,13 @@ begin
   gtk_text_buffer_get_iter_at_offset (buffer, @istart, TextStart);
   gtk_text_buffer_get_iter_at_offset (buffer, @iend, TextStart+TextLen);
   if uiLink in ui.features then begin
-    gtk_text_buffer_apply_tag_by_name(buffer, TagNameLink, @istart, @iend);
+    gColor := TColortoTGDKColor(clGreen); // todo: make an option
+    tag := gtk_text_buffer_create_tag(buffer, NULL, 'foreground-gdk', [ @gcolor,
+        'underline',      PANGO_UNDERLINE_SINGLE, NULL ] );
+    g_object_set_data(G_OBJECT(tag), TagNameLink,  StrNew(pchar(ui.linkref)));
+    gtk_text_buffer_apply_tag(buffer, tag, @istart, @iend);
   end else begin
-    tag := gtk_text_tag_table_lookup(
-         gtk_text_buffer_get_tag_table(buffer), TagNameLink);
+    tag := gtk_text_buffer_get_linkref_tag_at_offset(buffer, TextStart);
     if Assigned(tag) then
       gtk_text_buffer_remove_tag(buffer, tag, @istart, @iend);
   end;
@@ -1381,8 +1431,7 @@ begin
   Result:=Assigned(buffer);
   if not Result then Exit;
 
-  tag := gtk_text_tag_table_lookup(
-           gtk_text_buffer_get_tag_table(buffer), TagNameLink);
+  tag := gtk_text_buffer_get_linkref_tag_at_offset(buffer, TextStart);
   if Assigned(tag) then begin // which is odd.
     gtk_text_buffer_get_iter_at_offset (buffer, @istart, TextStart);
     if gtk_text_iter_has_tag(@istart, tag) then
