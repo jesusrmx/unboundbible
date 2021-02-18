@@ -967,11 +967,10 @@ end;
 
 procedure TMainForm.RefreshStatus;
 begin
-  try
-    StatusBar.SimpleText := ' ' + Statuses.KeyData[PageControl.ActivePageIndex];
-  except
+  if Statuses.IndexOf(PageControl.ActivePageIndex)>=0 then
+    StatusBar.SimpleText := ' ' + Statuses.KeyData[PageControl.ActivePageIndex]
+  else
     StatusBar.SimpleText := '';
-  end;
 end;
 
 procedure TMainForm.UpdateStatus(s: string);
