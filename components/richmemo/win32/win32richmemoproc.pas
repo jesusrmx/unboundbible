@@ -260,6 +260,11 @@ implementation
 const
   GlobalRichClass : AnsiString = '';
   UnicodeEnabledOS : Boolean = true; // todo: implement it to work with Windows 9x, if necessary
+
+  RECLS_RICHEDIT50W = 'RichEdit50W';
+  RECLS_RICHEDIT20W = 'RichEdit20W';
+  RECLS_RICHEDIT20A = 'RichEdit20A';
+  RECLS_RICHEDIT    = 'RichEdit';
   
 const
   TwipsInFontSize = 20; // see MSDN for CHARFORMAT Structure CFM_SIZE
@@ -273,13 +278,13 @@ function InitRichEdit: Boolean;
 begin
   if GlobalRichClass = '' then begin
     if LoadLibrary('Msftedit.dll') <> 0 then begin
-      GlobalRichClass := 'RichEdit50W';
+      GlobalRichClass := RECLS_RICHEDIT50W;
     end else if LoadLibrary('RICHED20.DLL') <> 0 then begin
-      if UnicodeEnabledOS then GlobalRichClass := 'RichEdit20W'
+      if UnicodeEnabledOS then GlobalRichClass := RECLS_RICHEDIT20W
       else
-      GlobalRichClass := 'RichEdit20A'
+      GlobalRichClass := RECLS_RICHEDIT20A
     end else if LoadLibrary('RICHED32.DLL') <> 0 then begin
-      GlobalRichClass := 'RichEdit';
+      GlobalRichClass := RECLS_RICHEDIT;
     end;
       
     if not Assigned(RichEditManager) then 
@@ -1065,7 +1070,12 @@ begin
       st := TStringStream.Create('');
       hp := '';
       try
-        SaveRichText(RichEditWnd, st, SFF_SELECTION);
+        // Rich Edit 3.0 and later: we can retrieve the text in UTF8 encoding
+        // ref: https://docs.microsoft.com/en-us/windows/win32/controls/em-streamout
+        l := SFF_SELECTION;
+        if GetRichEditClass=RECLS_RICHEDIT50W then
+          l := l or (CP_UTF8 shl 16) or SF_USECODEPAGE;
+        SaveRichText(RichEditWnd, st, l);
         hp := st.DataString;
       finally
         st.Free;
@@ -1079,7 +1089,7 @@ begin
           hps:=hpi;
           while (hpi <= length(hp)) and (hp[hpi] <> '"') do
             inc(hpi);
-          //todo: convert RTF chars into UTF8
+          //todo: if GetRichEditClass is not RECLS_RICHEDIT50W, convert RTF chars into UTF8
           LinkInfo.LinkRef := Copy(hp, hps, hpi-hps);
         end;
         Result := true;
