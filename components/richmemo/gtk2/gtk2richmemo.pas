@@ -202,8 +202,12 @@ begin
     g_slist_free(tags);
 end;
 
+procedure gtk_texttag_free_linkref(linkref: gpointer); cdecl;
+begin
+  StrDispose(pchar(linkref));
+end;
 
-function gtk_texttag_linkref(tag: PGtkTextTag): string;
+function gtk_texttag_get_linkref(tag: PGtkTextTag): string;
 var
   data: pointer;
 begin
@@ -214,19 +218,10 @@ begin
     result := '';
 end;
 
-procedure gtk_texttag_free_linkref(tag:PGtkTextTag; data:gpointer); cdecl;
+procedure gtk_texttag_set_linkref(tag:PGtkTextTag; linkRef: string);
 begin
-  data := g_object_get_data(G_OBJECT(tag), TagNameLink);
-  if data<>nil then
-    StrDispose(pchar(data));
-end;
-
-procedure gtk_text_buffer_free_linkref_tags(buffer: PGtkTextBuffer);
-var
-  table: PGtkTextTagTable;
-begin
-  table := gtk_text_buffer_get_tag_table(buffer);
-  gtk_text_tag_table_foreach (table, @gtk_texttag_free_linkref, nil)
+  g_object_set_data_full(G_OBJECT(tag), TagNameLink, StrNew(pchar(linkRef)),
+                         @gtk_texttag_free_linkref);
 end;
 
   // todo: why "shr" on each of this flag test?
@@ -537,7 +532,7 @@ begin
             else
               mi.button:=mbLeft;
             end;
-            mi.LinkRef := gtk_texttag_linkref(tag);
+            mi.LinkRef := gtk_texttag_get_linkref(tag);
             TCustomRichMemoInt(WidgetInfo^.LCLObject).DoLinkAction(act, mi, li, le);
           end;
         end;
@@ -881,9 +876,6 @@ begin
     , 0, 0, nil
     , @Gtk2WS_MemoSelChanged, GetWidgetInfo(w));
   g_signal_handler_disconnect (b, handlerid);
-
-  // free linkref tags memory
-  gtk_text_buffer_free_linkref_tags(b);
 
   // the proper way of destroying a widgetset
   Gtk2WidgetSet.DestroyLCLComponent(AWinControl);
@@ -1408,7 +1400,7 @@ begin
     gColor := TColortoTGDKColor(clGreen); // todo: make an option
     tag := gtk_text_buffer_create_tag(buffer, NULL, 'foreground-gdk', [ @gcolor,
         'underline',      PANGO_UNDERLINE_SINGLE, NULL ] );
-    g_object_set_data(G_OBJECT(tag), TagNameLink,  StrNew(pchar(ui.linkref)));
+    gtk_texttag_set_linkref(tag, ui.linkref);
     gtk_text_buffer_apply_tag(buffer, tag, @istart, @iend);
   end else begin
     tag := gtk_text_buffer_get_linkref_tag_at_offset(buffer, TextStart);
