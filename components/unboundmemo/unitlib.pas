@@ -34,6 +34,7 @@ procedure RemoveDoubleSpaces(var s: string);
 function RemoveTags(s: string): string;
 function RemoveCRLF(s: string): string;
 function iif(condition: boolean; trueResult, falseResult: variant): variant;
+function FieldValue(f: string; s: string; sep: string; start: integer = 1; def: string = ''): string;
 
 // unicode
 
@@ -244,6 +245,22 @@ end;
 function iif(condition: boolean; trueResult, falseResult: variant): variant;
 begin
   if condition then Result := trueResult else Result := falseResult;
+end;
+
+function FieldValue(f: string; s: string; sep: string; start: integer;
+  def: string): string;
+var
+  i, len: SizeInt;
+begin
+  i := PosEx(f, s, start);
+  if i>0 then
+    begin
+      len := PosEx(sep, s, i+length(f));
+      if len=0 then len := length(s)+1;
+      result := copy(s, i+length(f), len-length(f)-i);
+    end
+  else
+    result := def;
 end;
 
 // unicode

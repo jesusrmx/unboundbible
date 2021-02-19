@@ -31,8 +31,12 @@ type
   end;
 
 type
+
+  { TVerse }
+
   TVerse = record
     book, chapter, number, count : integer;
+    class operator = (a, b: TVerse): boolean;
   end;
 
   TVerseArray = array of TVerse;
@@ -265,6 +269,13 @@ begin
   CurrVerse.count := IniFile.ReadInteger('Verse', 'Count', 0);
 
   IniFile.Free;
+end;
+
+{ TVerse }
+
+class operator TVerse.= (a, b: TVerse): boolean;
+begin
+  result := (a.book=b.book) and (a.chapter=b.chapter) and (a.number=b.number);
 end;
 
 initialization

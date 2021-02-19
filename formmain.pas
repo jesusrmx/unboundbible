@@ -263,6 +263,7 @@ type
     procedure HistoryUpdate;
     procedure JumpToLink(Verse: TVerse);
     procedure LangMenuInit;
+    function  LinkToVerse(aLink: string; out verseRec: TVerse; out aVerse, aBible: string): boolean;
     procedure LoadChapter;
     procedure LoadSearch(s: string);
     procedure LoadCompare;
@@ -310,6 +311,15 @@ const
   apCommentaries = 4;
   apDictionaries = 5;
   apNotes        = 6;
+
+  TAG_UNBOUND     = 'unbound://';
+  TAG_VERSEID     = 'verseid';
+  TAG_BOOK        = 'book=';
+  TAG_CHAPTER     = 'chapter=';
+  TAG_NUMBER      = 'number=';
+  TAG_COUNT       = 'count=';
+  TAG_BIBLE       = 'bible=';
+  TAG_FIELDSEP    = '&';
 
 {$R *.lfm}
 
@@ -924,16 +934,6 @@ begin
 
   if Memo.hyperlink = '' then Exit;
 
-  if Memo.Foreground = fgLink then
-    if SelectBible(Memo.hyperlink, true) then
-      Exit;
-
-  if Memo.Foreground = fgLink then
-      begin
-        Verse := CurrBible.SrtToVerse(Memo.hyperlink);
-        if Verse.Book > 0 then JumpToLink(Verse);
-      end;
-
   if Memo = MemoBible then
     if Memo.Foreground = fgFootnote then LoadFootnote(Memo.hyperlink);
 
@@ -972,8 +972,13 @@ var
 begin
   verse := CurrBible.VerseToStr(CurrVerse, true);
   with CurrVerse do
-    result := format('unbound://%s/id?book=%.2d&chapter=%.2d&verse=%.2d&count=%.2d&bible=%s',
-    [verse, book, chapter, number, count, CurrBible.name]);
+    result :=
+      TAG_UNBOUND + verse + '/' + TAG_VERSEID + '?' +
+      TAG_BOOK + IntToStr(book) + TAG_FIELDSEP +
+      TAG_CHAPTER + IntToStr(chapter) + TAG_FIELDSEP +
+      TAG_NUMBER + IntToStr(number) + TAG_FIELDSEP +
+      TAG_COUNT + IntToStr(count) + TAG_FIELDSEP +
+      TAG_BIBLE + CurrBible.name;
 end;
 
 procedure TMainForm.UpdateCaption(s: string);
@@ -1191,6 +1196,38 @@ begin
   end;
 end;
 
+function TMainForm.LinkToVerse(aLink: string; out verseRec: TVerse; out aVerse,
+  aBible: string): boolean;
+var
+  a, b: Integer;
+begin
+  result := false;
+
+  a := pos(TAG_UNBOUND, aLink);
+  if a=0 then
+    exit; // this is not a valid link
+  inc(a, Length(TAG_UNBOUND));
+
+  b := pos('/'+TAG_VERSEID+'?', aLink);
+  if b>0 then begin
+    // this is a verse uri
+    aVerse := FieldValue(TAG_UNBOUND, aLink, '/');
+    try
+      b := b + length(TAG_VERSEID) + 2;
+      verseRec.book     := StrToInt(FieldValue(TAG_BOOK,    aLink, TAG_FIELDSEP, b));
+      verseRec.chapter  := StrToInt(FieldValue(TAG_CHAPTER, aLink, TAG_FIELDSEP, b));
+      verseRec.number   := StrToInt(FieldValue(TAG_NUMBER,  aLink, TAG_FIELDSEP, b));
+      verseRec.count    := StrToInt(FieldValue(TAG_COUNT,   aLink, TAG_FIELDSEP, b));
+      aBible            :=          FieldValue(TAG_BIBLE,   aLink, TAG_FIELDSEP, b);
+      result := true;
+    except
+      result := false;
+    end;
+    exit;
+  end;
+
+end;
+
 procedure TMainForm.RecentMenuInit;
 var
   Item : TMenuItem;
@@ -1228,14 +1265,18 @@ procedure TMainForm.MemoNotesLinkAction(Sender: TObject;
   ALinkAction: TLinkAction; const info: TLinkMouseInfo; LinkStart,
   LinkLen: Integer);
 var
-  s: string;
+  linkBible, linkVerseStr: string;
+  linkVerse: TVerse;
 begin
-  WriteStr(s, Info.Button);
-  WriteLn('LinkAction:');
-  WriteLn('  Button=', s);
-  WriteLn('  LinkRef=', Info.LinkRef);
-  WriteLn('  LinkStart=', LinkStart);
-  WriteLn('  LinkLen=', LinkLen);
+  if LinkToVerse(Info.LinkRef, linkVerse, linkVerseStr, linkBible) then
+    begin
+      if linkBible<>currBible.name then
+        if SelectBible(linkBible, true) then begin
+          if currVerse=linkVerse then
+            exit;
+        end;
+      JumpToLink(linkVerse);
+    end;
 end;
 
 procedure TMainForm.EnableActions;
