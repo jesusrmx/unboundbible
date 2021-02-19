@@ -529,6 +529,13 @@ var
 begin
   if RichEditWnd = 0 then Exit;
 
+  if GetRichEditClass=RECLS_RICHEDIT50W then
+  begin
+    // do it in the WinXP way
+    TRichEditManagerWinXP.SetTextUIStyle(RichEditWnd, ui);
+    Exit;
+  end;
+
   w := SCF_SELECTION;
 
   FillChar(fmt, sizeof(fmt), 0);
