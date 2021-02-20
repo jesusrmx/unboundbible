@@ -113,6 +113,7 @@ var
   font: QFontH;
   refForeColor, refBackColor: TQColor;
   brush: QBrushH;
+  doc: QTextDocumentH;
 
   function SameFormats: boolean;
   var
@@ -139,13 +140,18 @@ var
 
 begin
   result := false;
-  QTextCursor_setPosition(cursor, start );
+
+  doc := QTextCursor_document(cursor);
+  if start + 1 >= QTextDocument_characterCount(doc) then
+    exit;
+
+  QTextCursor_setPosition(cursor, start + 1);
+
+  rangeStart := start;
+  rangeEnd   := rangeStart;
 
   fmtRef := QTextCharFormat_Create();
   fmtCur := QTextCharFormat_Create();
-
-  rangeStart := QTextCursor_Position(cursor);
-  rangeEnd   := rangeStart;
 
   QTextCursor_charFormat(cursor, fmtRef);
 
@@ -163,18 +169,19 @@ begin
 
   // find left limit
   while QTextCursor_movePosition(cursor, QTextCursorPreviousCharacter) do begin
-    dec(rangeStart);
     QTextCursor_charFormat(cursor, fmtCur);
     if not SameFormats then
       break;
+    rangeStart := QTextCursor_Position(cursor);
   end;
 
-  QTextCursor_setPosition(cursor, rangeEnd);
+
+  QTextCursor_setPosition(cursor, start + 1);
   while QTextCursor_movePosition(cursor, QTextCursorNextCharacter) do begin
     QTextCursor_charFormat(cursor, fmtCur);
     if not SameFormats then
       break;
-    inc(rangeEnd);
+    rangeEnd := QTextCursor_Position(cursor);
   end;
 
   if not refIsAnchor then begin
@@ -282,6 +289,7 @@ var
   ws : WideString;
   clr: TQColor;
   bck : TEditorState;
+  tc: QTextCursorH;
 begin
   InitFontParams(Params);
   if not WSCheckHandleAllocated(AWinControl, 'GetTextAttributes') then begin
@@ -300,6 +308,13 @@ begin
   // (the expected behaviour) but the attributes of the next block which is wrong
   //te.setSelection(TextStart, 1);
   te.setSelection(TextStart, 0);
+
+  tc := QTextCursor_Create();
+  QTextEdit_textCursor(w, tc);
+  if not QTextCursor_atBlockEnd(tc) then
+    te.setSelection(TextStart, 1);
+  QTextCursor_Destroy(tc);
+
 
   //todo!
   ws:='';
@@ -490,6 +505,8 @@ begin
   tc := QTextCursor_create();
   QTextEdit_textCursor(w, tc);
   QTextCursor_setPosition(tc, TextStart);
+  if not QTextCursor_atBlockEnd(tc) then
+    QTextCursor_setPosition(tc, TextStart + 1);
 
   fmt := QTextCharFormat_Create();
   QTextCursor_charFormat(tc, fmt);
@@ -497,6 +514,7 @@ begin
   begin
     QTextCharFormat_anchorHref(fmt, @address);
     ui.linkref := UTF8Encode(address);
+    include(ui.features, uiLink);
     result := true;
   end;
   QTextCharFormat_Destroy(fmt);
@@ -572,12 +590,7 @@ begin
   QTextEdit_textCursor(QTextEditH(te.Widget), qcur);
   result := PrivateGetFormatRange(qCur, TextStart, RangeStart, RangeLen);
   if result then
-    RangeLen := RangeLen - RangeStart
-  else begin
-    RangeStart:=TextStart;
-    RangeLen:=1;
-    Result:=true;
-  end;
+    RangeLen := RangeLen - RangeStart;
   QTextCursor_Destroy(qcur);
   {$else}
   MakeBackup(te, bck);
