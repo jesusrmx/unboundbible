@@ -241,6 +241,7 @@ type
       const ParaMetric: TParaMetric);
 
     procedure SetLink(TextStart, TextLength: Integer; AIsLink: Boolean; const ALinkRef: String = ''); virtual;
+    function GetLink(TextStart: Integer; out ALinkRef: string): boolean; virtual;
     function isLink(TextStart: Integer): Boolean; virtual;
 
     function LoadRichText(Source: TStream): Boolean; virtual;
@@ -957,6 +958,19 @@ begin
     end else
       Exclude(ui.features, uiLink);
     TWSCustomRichMemoClass(WidgetSetClass).SetTextUIParams(Self, TextStart, TextLength, ui);
+  end;
+end;
+
+function TCustomRichMemo.GetLink(TextStart: Integer; out ALinkRef: string
+  ): boolean;
+var
+  ui: TTextUIParam;
+begin
+  result := HandleAllocated and
+            TWSCustomRichMemoClass(WidgetsetClass).GetTextUIParams(Self, TextStart, ui);
+  if result then begin
+    result := uiLink in ui.features;
+    ALinkRef := ui.linkref;
   end;
 end;
 

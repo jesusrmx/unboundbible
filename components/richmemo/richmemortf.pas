@@ -705,6 +705,7 @@ type
     colorId    : Integer;
     textStart  : Integer;
     textLength : Integer;
+    linkRef    : string;
     next       : TStyleRange;
   end;
 
@@ -811,6 +812,7 @@ var
   i         : Integer;
   isnewpara : Boolean;
   s         : string;
+  aLinkRef  : string;
 
   isbold    : Boolean;
   isitalic  : Boolean;
@@ -843,6 +845,9 @@ begin
     end else
       rng.textLength:=len;
     ARich.GetTextAttributes(ofs, rng.font);
+
+    if ARich.GetLink(ofs, aLinkRef) then
+      rng.linkRef := aLinkRef;
 
     if not Assigned(root) then root:=rng;
     if Assigned(last) then last.next:=rng;
@@ -940,27 +945,33 @@ begin
       RtfOut(' ');
 
       i:=1;
-      while i<=length(u) do begin
-        if isNewPara then begin
-          ARich.GetParaMetric(i+rng.textStart, pm);
-          RtfOut('\pard');
-          case ARich.GetParaAlignment(i+rng.TextStart) of
-            paRight:   RtfOut('\qr');
-            paCenter:  RtfOut('\qc');
-            paJustify: RtfOut('\qj');
-          else
+      if rng.linkRef<>'' then begin
+        RtfOut('{\field ');
+        RtfOut(format('{\*\fldinst{ HYPERLINK "%s"}}',[rng.linkRef]));
+        RtfOut(format('{\fldrslt{%s}}}',[GetRTFWriteText(u, i, isnewpara)]));
+      end else begin
+        while i<=length(u) do begin
+          if isNewPara then begin
+            ARich.GetParaMetric(i+rng.textStart, pm);
+            RtfOut('\pard');
+            case ARich.GetParaAlignment(i+rng.TextStart) of
+              paRight:   RtfOut('\qr');
+              paCenter:  RtfOut('\qc');
+              paJustify: RtfOut('\qj');
+            else
+            end;
+            RtfOut('\li'+IntToStr(round(pm.HeadIndent*20)));
+            if pm.FirstLine-pm.HeadIndent<>0 then
+              RtfOut('\fi'+IntToStr(round((pm.FirstLine-pm.HeadIndent)*20)));
+            if pm.TailIndent<>0 then RtfOut('\ri'+IntToStr(round(pm.TailIndent*20)));
+            if pm.SpaceAfter<>0 then RtfOut('\sa'+IntToStr(round(pm.SpaceAfter*20)));
+            if pm.SpaceBefore<>0 then RtfOut('\sb'+IntToStr(round(pm.SpaceBefore*20)));
+            if pm.LineSpacing<>0 then RtfOut('\sl'+IntToStr(round(pm.LineSpacing*200))+'\slmult1');
+            RtfOut(' ');
           end;
-          RtfOut('\li'+IntToStr(round(pm.HeadIndent*20)));
-          if pm.FirstLine-pm.HeadIndent<>0 then
-            RtfOut('\fi'+IntToStr(round((pm.FirstLine-pm.HeadIndent)*20)));
-          if pm.TailIndent<>0 then RtfOut('\ri'+IntToStr(round(pm.TailIndent*20)));
-          if pm.SpaceAfter<>0 then RtfOut('\sa'+IntToStr(round(pm.SpaceAfter*20)));
-          if pm.SpaceBefore<>0 then RtfOut('\sb'+IntToStr(round(pm.SpaceBefore*20)));
-          if pm.LineSpacing<>0 then RtfOut('\sl'+IntToStr(round(pm.LineSpacing*200))+'\slmult1');
-          RtfOut(' ');
+          s:=GetRTFWriteText(u, i, isnewpara);
+          RtfOut(s);
         end;
-        s:=GetRTFWriteText(u, i, isnewpara);
-        RtfOut(s);
       end;
       rng:=rng.next;
     end;

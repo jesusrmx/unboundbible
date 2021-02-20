@@ -1424,10 +1424,9 @@ begin
   if not Result then Exit;
 
   tag := gtk_text_buffer_get_linkref_tag_at_offset(buffer, TextStart);
-  if Assigned(tag) then begin // which is odd.
-    gtk_text_buffer_get_iter_at_offset (buffer, @istart, TextStart);
-    if gtk_text_iter_has_tag(@istart, tag) then
-      Include(ui.features, uiLink);
+  if Assigned(tag) then begin
+    Include(ui.features, uiLink);
+    ui.linkref := gtk_texttag_get_linkref(tag);
   end;
 end;
 
