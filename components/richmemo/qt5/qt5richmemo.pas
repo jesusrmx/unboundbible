@@ -350,6 +350,9 @@ var
   ss, sl :  Integer;
   ws : WideString;
   clr: TQColor;
+  tc: QTextCursorH;
+  fmt: QTextCharFormatH;
+  Brush: QBrushH;
 const
   QNormal = 50;
   QBold   = 75;
@@ -366,25 +369,40 @@ begin
 
   te.setSelection(TextStart, TextLen);
 
+  tc := QTextCursor_Create();
+  fmt := QTextCharFormat_Create();
+
+  QTextEdit_textCursor(w, tc);
+  QTextCursor_charFormat(tc, fmt);
+
   ws:=UTF8Decode(Params.Name);
-  if ws<>'' then QTextEdit_setFontFamily(w, @ws);
-  if Params.Size>0 then QTextEdit_setFontPointSize(w, Params.Size);
-  QTextEdit_setFontUnderline(w, fsUnderline in Params.Style);
-  QTextEdit_setFontWeight(w, QisBold[fsBold in Params.Style]);
-  QTextEdit_setFontItalic(w, fsItalic in Params.Style);
+  if ws<>'' then QTextCharFormat_setFontFamily(fmt, @ws);
+  if Params.Size>0 then QTextCharFormat_setFontPointSize(fmt, Params.Size);
+  QTextCharFormat_setFontUnderline(fmt, fsUnderline in Params.Style);
+  QTextCharFormat_setFontWeight(fmt, QisBold[fsBold in Params.Style]);
+  QTextCharFormat_setFontItalic(fmt, fsItalic in Params.Style);
 
-  ColorRefToTQColor(Params.Color, clr);
-  QTextEdit_setTextColor(w, @clr);
+  ColorRefToTQColor(ColorToRGB(Params.Color), clr);
+  Brush := QBrush_create(@clr, QtSolidPattern);
+  QTextFormat_setForeground(QTextFormatH(fmt), brush);
+  QBrush_Destroy(Brush);
 
-  //todo:
-  {
-  if not Params.HasBkClr then begin
-    ColorRefToTQColor(Params.BkColor, clr);
-    clr.Alpha:=0;
-  end else
-    ColorRefToTQColor(Params.BkColor, clr);
-  QTextEdit_setTextBackgroundColor(w, @clr);
-  }
+  if Params.HasBkClr then begin
+    ColorRefToTQColor(ColorToRGB(Params.BkColor), clr);
+    Brush := QBrush_create(@clr, QtSolidPattern);
+    QTextFormat_setBackground(QTextFormatH(fmt), brush);
+    QBrush_Destroy(Brush);
+  end;
+
+  QTextCharFormat_setAnchor(fmt, false);
+  ws := '';
+  QTextCharFormat_setAnchorHref(fmt, @ws);
+
+  QTextCursor_setCharFormat(tc, fmt);
+  QTextEdit_setTextCursor(w, tc);
+
+  QTextCharFormat_Destroy(fmt);
+  QTextCursor_Destroy(tc);
 
   te.setSelection(ss, sl);
 end;
@@ -495,6 +513,7 @@ var
   fmt: QTextCharFormatH;
   Color: TQColor;
   Brush: QBrushH;
+  doc: QTextDocumentH;
 begin
   result := false;
   if not WSCheckHandleAllocated(AWinControl, 'SetTextUIParams') then
@@ -503,21 +522,24 @@ begin
   te:=TQtTextEdit(AWinControl.Handle);
   w:=QTextEditH(te.Widget);
   tc := QTextCursor_create();
-  QTextEdit_textCursor(w, tc);
-  QTextCursor_setPosition(tc, TextStart);
-  if not QTextCursor_atBlockEnd(tc) then
-    QTextCursor_setPosition(tc, TextStart + 1);
 
-  fmt := QTextCharFormat_Create();
-  QTextCursor_charFormat(tc, fmt);
-  if QTextCharFormat_isAnchor(fmt) then
+  QTextEdit_textCursor(w, tc);
+  doc := QTextCursor_document(tc);
+
+  if TextStart + 1 < QTextDocument_characterCount(doc) then
   begin
-    QTextCharFormat_anchorHref(fmt, @address);
-    ui.linkref := UTF8Encode(address);
-    include(ui.features, uiLink);
-    result := true;
+    QTextCursor_setPosition(tc, TextStart + 1);
+    fmt := QTextCharFormat_Create();
+    QTextCursor_charFormat(tc, fmt);
+    if QTextCharFormat_isAnchor(fmt) then
+    begin
+      QTextCharFormat_anchorHref(fmt, @address);
+      ui.linkref := UTF8Encode(address);
+      include(ui.features, uiLink);
+      result := true;
+    end;
+    QTextCharFormat_Destroy(fmt);
   end;
-  QTextCharFormat_Destroy(fmt);
 
   QTextCursor_Destroy(tc);
 end;
