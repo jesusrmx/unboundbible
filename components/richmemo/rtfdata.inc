@@ -452,6 +452,21 @@ type
     rtfNextStyle : PRTFStyle;       { next style in style list }
   end;
 
+  TRTFFieldMod = record
+    rtfFieldDiry: boolean;
+    rtfFieldEdit: boolean;
+    rtfFieldLock: boolean;
+    rtfFildPriv: boolean;
+  end;
+
+  PRTFField = ^TRTFField;
+  TRTFField = record
+    valid: boolean;
+    rtfFieldMod: TRTFFieldMod;
+    rtfFieldInst: string;
+    rtfFieldRslt: string;
+  end;
+
 { ---------------------------------------------------------------------
        Control symbol lookup routines
   ---------------------------------------------------------------------}

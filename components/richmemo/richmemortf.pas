@@ -97,6 +97,7 @@ type
                          // question mark instead.
 
     procedure AddText(const atext: string);
+    function  ResolveHyperlink(out alinkref: string): boolean;
   protected
     procedure classUnk;
     procedure classText;
@@ -316,6 +317,24 @@ begin
   end;
   Move(atext[1], txtbuf[txtlen+1], length(atext));
   inc(txtlen, length(atext));
+end;
+
+function TRTFMemoParser.ResolveHyperlink(out alinkref: string): boolean;
+var
+  p: SizeInt;
+begin
+  result := (Field.valid);
+  if result then begin
+    p := pos('HYPERLINK', Field.rtfFieldInst);
+    result := p>0;
+    if result then begin
+      aLinkref := Trim(copy(Field.rtfFieldInst, p + 9, Length(Field.rtfFieldInst)));
+      p := 1;
+      if (aLinkRef<>'') and (aLinkref[p] in ['"','''']) then Delete(aLinkRef, p, 1);
+      p := Length(aLinkref);
+      if (aLinkRef<>'') and (aLinkref[p] in ['"','''']) then Delete(aLinkRef, p, 1);
+    end;
+  end;
 end;
 
 procedure TRTFMemoParser.classUnk;
@@ -605,6 +624,11 @@ begin
   //prm.fnt.HasBkClr:=hasbk;
   //prm.fnt.BkColor:=bcolor;
   Memo.SetTextAttributes(selst, len, prm.fnt);
+
+  if Field.valid then begin
+    if ResolveHyperlink(b) then
+      Memo.SetLink(selst, len, true, b);
+  end;
 end;
 
 constructor TRTFMemoParser.Create(AMemo:TCustomRichMemo;AStream:TStream);
@@ -947,7 +971,7 @@ begin
       i:=1;
       if rng.linkRef<>'' then begin
         RtfOut('{\field ');
-        RtfOut(format('{\*\fldinst{ HYPERLINK "%s"}}',[rng.linkRef]));
+        RtfOut(format('{\*\fldinst HYPERLINK "%s"}',[rng.linkRef]));
         RtfOut(format('{\fldrslt{%s}}}',[GetRTFWriteText(u, i, isnewpara)]));
       end else begin
         while i<=length(u) do begin

@@ -41,6 +41,7 @@ type
     FrtfMajor     : Integer;
     FrtfMinor     : Integer;
     FrtfParam     : Integer;
+    FrtfField     : TRTFField;
     rtfTextBuf    : string [rtfBufSiz];
     rtfTextLen    : Integer;
     pushedChar    : Integer;               { pushback char if read too far }
@@ -56,6 +57,7 @@ type
     FTokenClass: Integer;
     procedure Error (msg : String);
     procedure LookupInit ;
+    procedure ReadFieldGroup;
     procedure ReadFontTbl ;
     procedure ReadColorTbl;
     procedure ReadStyleSheet ;
@@ -104,6 +106,7 @@ type
     property rtfParam : Integer Read FrtfParam;
     property Stream : TStream Read FStream Write SetStream;
     property Styles [index : Integer] : PRTFStyle Read GetStyle;
+    property Field : TRTFField Read FrtfField;
   end;
 
 Implementation
@@ -183,6 +186,7 @@ begin
   SetDestinationCallback (rtfStyleSheet, @ReadStyleSheet);
   SetDestinationCallback (rtfInfo, @ReadInfoGroup);
   SetDestinationCallback (rtfPict, @ReadPictGroup);
+  SetDestinationCallback (rtfField, @ReadFieldGroup);
 
   SetReadHook (Nil);
 
@@ -604,6 +608,68 @@ end;
        of class rtfUnknown will throw them off easily.
  ----------------------------------------------------------------------}
 
+ {
+ <field>      '{' \field <fieldmod>? <fieldinst> <fieldrslt> '}'
+ <fieldmod>    \flddirty? & \fldedit? & \fldlock? & \fldpriv?
+ <fieldinst>   '{\*' \fldinst <para>+ <fldalt>? '}'
+ <fldalt>      \fldalt
+ <fieldrslt>   '{' \fldrslt <para>+ '}'
+ }
+
+procedure TRTFParser.ReadFieldGroup;
+var
+  level: Integer = 1;
+  gotFieldinst: boolean = false;
+  gotFieldrslt: Boolean = false;
+  content: string;
+begin
+  content := '';
+  FrtfField.valid:= true;
+  Initialize(FrtfField);
+  while true do begin
+    GetToken;
+    if CheckCM(rtfGroup, rtfEndGroup) then begin
+      if gotFieldinst then begin
+        gotFieldinst := false;
+        FrtfField.rtfFieldInst := content;
+        content := '';
+      end;
+      if gotFieldrslt then begin
+        gotFieldrslt := false;
+        FrtfField.rtfFieldRslt := content;
+        content := '';
+      end;
+      dec(level);
+      if level=0 then begin
+        RouteToken;
+        break;
+      end;
+    end else
+    if CheckCM(rtfGroup, rtfBeginGroup) then begin
+      inc(level);
+    end else
+    if CheckCMM(rtfControl, rtfSpecialChar, rtfOptDest) then begin
+      continue;
+    end else
+    if CheckCMM(rtfControl, rtfDestination, rtfFieldInst) then begin
+      gotFieldinst := true;
+    end else
+    if CheckCMM(rtfControl, rtfDestination, rtfFieldResult) then begin
+      gotFieldrslt := true;
+    end else
+    if rtfClass=rtfText then begin
+      content := content + chr(rtfMajor);
+      if gotFieldInst or not gotFieldRslt then
+        continue;
+    end;
+    RouteToken;
+  end;
+
+  // syntetize a token which would triggger field result expression
+  SetToken(rtfControl, rtfUnknown, rtfUnknown, rtfNoParam, '');
+  RouteToken;
+  FrtfField.valid:= false;
+end;
 
 { Read Begin \fonttbl ... End; destination.  Old font tables don't have
   braces around each table entry; try to adjust for that.}
