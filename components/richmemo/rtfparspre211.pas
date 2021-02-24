@@ -707,16 +707,16 @@ begin
       Error ('FTErr - missing font number');
     fp^.rtfFNum := rtfParam;
 
-    { Read optionalcommands. Recognize only fontfamily}
-    GetToken;
-    if not CheckCM (rtfControl, rtfFontFamily) then
-      error ('FTErr - missing font family ');
-    fp^.rtfFFamily := rtfMinor;
-
     { Read optional commands/groups. Recognize none at this point..}
     GetToken;
     while (rtfclass=rtfcontrol) or ((rtfclass=rtfgroup) or (rtfclass=rtfunknown)) do begin
+
+      { Read optionalcommands. Recognize only fontfamily}
+      if CheckCM (rtfControl, rtfFontFamily) then
+        fp^.rtfFFamily := rtfMinor;
+
       if rtfclass=rtfgroup then SkipGroup;
+
       GetToken
     end;
 
@@ -733,6 +733,14 @@ begin
 
     { Read alternate font}
     if (old=0) then begin { need to see "End;" here }
+      if CheckCM (rtfGroup, rtfBeginGroup) then begin
+        SkipGroup;
+        GetToken;
+      end;
+      // we have to see ';' here, eat it.
+      if (rtfClass<>rtfText) or (rtfMajor <> ord(';')) then
+        Error ('FTErr - missing ;');
+
       GetToken;
       if not CheckCM (rtfGroup, rtfEndGroup) then
         Error ('FTErr - missing }');
