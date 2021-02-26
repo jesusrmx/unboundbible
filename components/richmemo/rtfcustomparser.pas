@@ -547,8 +547,32 @@ begin
 end;
 
 procedure TRTFCustomParser.Consolidate;
+var
+  track: array of boolean;
+  i, last: Integer;
 begin
+  last := 0;
+  SetLength(track, length(chunks));
+  track[0] := false
+  for i:=1 to Length(chunks)-1 do begin
+    // todo: this comparison should be made in the type of chunk[]
+    if (Chunks[i].Link=Chunks[last].Link) and (Chunks[i].prm.Equal(Chunks[i].prm)) then begin
+      Chunks[last].Text := Chunks[last].Text + Chunks[i].Text;
+      Track[i] := true
+    end else begin
+      last := i;
+      Track[i] := false;
+    end;
+  end;
 
+  //WriteLn('Chunks Before consolidate: ', Length(Chunks));
+  for i:=length(track)-1 downto 0 begin
+    if Track[i] then begin
+      Chunks[i].prm.Free;
+      Delete(Chunks, i, 1);
+    end;
+  end;
+  //WriteLn('Chunks After consolidate: ', Length(Chunks));
 end;
 
 constructor TRTFCustomParser.Create(AStream: TStream);
