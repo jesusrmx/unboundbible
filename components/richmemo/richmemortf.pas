@@ -581,11 +581,6 @@ constructor TRTFMemoParser.Create(AMemo:TCustomRichMemo;AStream:TStream);
 begin
   inherited Create(AStream);
   Memo:=AMemo;
-  ClassCallBacks[rtfText]:=@classText;
-  ClassCallBacks[rtfControl]:=@classControl;
-  ClassCallBacks[rtfGroup]:=@classGroup;
-  ClassCallBacks[rtfUnknown]:=@classUnk;
-  ClassCallBacks[rtfEof]:=@classEof;
 end;
 
 destructor TRTFMemoParser.Destroy;
