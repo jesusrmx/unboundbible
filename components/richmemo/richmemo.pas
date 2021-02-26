@@ -154,6 +154,31 @@ type
     linkref  : String;
   end;
 
+  { TRTFParams }
+
+  TRTFParams = class(TObject)
+  public
+    fnt  : TFontParams;
+    pm   : TParaMetric;
+    pa   : TParaAlignment;
+    fnum : Integer; // font index in the font table
+
+    prev : TRTFParams;
+    tabs : TTabStopList;
+    constructor Create(aprev: TRTFParams);
+    procedure ResetDefault;
+    procedure AddTab(AOffset: double; ta: TTabAlignment);
+    function  Equal(prm: TRTFParams): boolean;
+  end;
+
+  TChunk = record
+    prm: TRTFParams;
+    Text: string;
+    Link: string;
+  end;
+
+  TRTFChunkArray = array of TChunk;
+
 type
   TRichMemoObject = class(TObject);
   TCustomRichMemo = class;
@@ -213,6 +238,9 @@ type
     procedure CutToClipboard; override;
     procedure PasteFromClipboard; override;
     function CanPaste: Boolean; virtual;
+    procedure BeginUpdate;
+    procedure EndUpdate;
+    procedure LoadFromChunkArray(chunks: TRTFChunkArray);
     
     procedure SetTextAttributes(TextStart, TextLen: Integer; const TextParams: TFontParams); virtual;
     function GetTextAttributes(TextStart: Integer; var TextParams: TFontParams): Boolean; virtual;
@@ -509,6 +537,71 @@ end;
 procedure InitTextUIParams(var prm: TTextUIParam);
 begin
   FillChar(prm, sizeof(prm), 0);
+end;
+
+{ TRTFParams }
+
+constructor TRTFParams.Create(aprev: TRTFParams);
+begin
+  prev:=aprev;
+  if Assigned(prev) then begin
+    fnt:=prev.fnt;
+    pm:=prev.pm;
+    pa:=prev.pa;
+    fnum:=prev.fnum;
+  end else begin
+    FillChar(fnt, SizeOf(fnt), 0);
+    FillChar(pm, sizeof(pm), 0);
+    pm.LineSpacing:=DefLineSpacing;
+  end;
+end;
+
+procedure TRTFParams.ResetDefault;
+begin
+  // default values are taken from RTF specs
+  // see section "Paragraph Formatting Properties"
+  pa:=paLeft;
+  pm.FirstLine:=0;
+  pm.HeadIndent:=0;
+  pm.TailIndent:=0;
+  pm.SpaceBefore:=0;
+  pm.SpaceAfter:=0;
+  pm.LineSpacing:=0;
+  tabs.Count:=0;
+end;
+
+procedure TRTFParams.AddTab(AOffset: double; ta: TTabAlignment);
+begin
+  if tabs.Count=length(tabs.Tabs) then begin
+    if tabs.Count=0 then SetLength(tabs.Tabs, 4)
+    else SetLength(tabs.Tabs, tabs.Count*2);
+  end;
+  tabs.Tabs[tabs.Count].Offset:=AOffset;
+  tabs.Tabs[tabs.Count].Align:=ta;
+  inc(tabs.Count);
+end;
+
+function TRTFParams.Equal(prm: TRTFParams): boolean;
+begin
+  result := pa=prm.pa;
+  if not result then begin
+    result :=
+      (fnt.Name=prm.fnt.Name) and
+      (fnt.Size=prm.fnt.Size) and
+      (fnt.Color=prm.fnt.Color) and
+      (fnt.Style=prm.fnt.Style) and
+      (fnt.VScriptPos=prm.fnt.VScriptPos) and
+      (fnt.HasBkClr=prm.fnt.HasBkClr) and
+      (fnt.BkColor=prm.fnt.BkColor);
+    if result then
+      result :=
+        (pm.LineSpacing=prm.pm.LineSpacing) and
+        (pm.FirstLine=prm.pm.FirstLine) and
+        (pm.HeadIndent=prm.pm.HeadIndent) and
+        (pm.SpaceAfter=prm.pm.SpaceAfter) and
+        (pm.SpaceBefore=prm.pm.SpaceBefore) and
+        (pm.TailIndent=prm.pm.TailIndent);
+  end;
 end;
 
 { TRichMemoInline }
@@ -845,6 +938,24 @@ begin
     Result:=TWSCustomRichMemoClass(WidgetSetClass).CanPasteFromClipboard(Self)
   else
     Result:=false;
+end;
+
+procedure TCustomRichMemo.BeginUpdate;
+begin
+  if HandleAllocated then
+    TWSCustomRichMemoClass(WidgetSetClass).BeginUpdate(Self);
+end;
+
+procedure TCustomRichMemo.EndUpdate;
+begin
+  if HandleAllocated then
+    TWSCustomRichMemoClass(WidgetSetClass).EndUpdate(Self);
+end;
+
+procedure TCustomRichMemo.LoadFromChunkArray(chunks: TRTFChunkArray);
+begin
+  if HandleAllocated then
+    TWSCustomRichMemoClass(WidgetSetClass).LoadFromChunkArray(Self, chunks);
 end;
 
 procedure TCustomRichMemo.SetRangeColor(TextStart, TextLength: Integer; FontColor: TColor);

@@ -31,12 +31,15 @@ type
   { TRTFMemoParser }
 
   TRTFMemoParser = class(TRTFCustomParser)
+  private
+    fFast: boolean;
   protected
     procedure PushText; override;
   public
     Memo  : TCustomRichMemo;
     constructor Create(AMemo: TCustomRichMemo; AStream: TStream);
     procedure StartReading; override;
+    property Fast: boolean read fFast write fFast;
   end;
 
 { TRTFMemoParserr }
@@ -48,6 +51,12 @@ var
   selst : Integer;
   b     : string;
 begin
+
+  if fFast then begin
+    inherited PushText;
+    exit;
+  end;
+
   if not Assigned(prm) then exit;
   if txtlen=0 then Exit;
 
@@ -105,15 +114,21 @@ end;
 
 procedure TRTFMemoParser.StartReading;
 begin
-  Memo.Lines.BeginUpdate;
-  try
-
+  if fFast then begin
     inherited StartReading;
-
-    Memo.SelStart:=0;
-    Memo.SelLength:=0;
-  finally
-    Memo.Lines.EndUpdate;
+    Consolidate;
+    Memo.BeginUpdate;
+    Memo.LoadFromChunkArray(Chunks);
+    Memo.EndUpdate;
+  end else begin
+    Memo.Lines.BeginUpdate;
+    try
+      inherited StartReading;
+      Memo.SelStart:=0;
+      Memo.SelLength:=0;
+    finally
+      Memo.Lines.EndUpdate;
+    end;
   end;
 end;
 

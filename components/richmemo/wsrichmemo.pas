@@ -55,6 +55,10 @@ type
     class procedure CopyToClipboard(const AWinControl: TWinControl); virtual;
     class procedure PasteFromClipboard(const AWinControl: TWinControl); virtual;
     class function CanPasteFromClipboard(const AWinControl: TWinControl): Boolean; virtual;
+
+    class procedure BeginUpdate(const AWinControl: TWinControl); virtual;
+    class procedure EndUpdate(const AWinControl: TWinControl); virtual;
+    class procedure LoadFromChunkArray(const AWinCOntrol: TWinControl; chunks: TRTFChunkArray); virtual;
     
     class function GetStyleRange(const AWinControl: TWinControl; TextStart: Integer; var RangeStart, RangeLen: Integer): Boolean; virtual;
     class function GetTextAttributes(const AWinControl: TWinControl; TextStart: Integer;
@@ -151,6 +155,22 @@ class function TWSCustomRichMemo.CanPasteFromClipboard(
   const AWinControl: TWinControl): Boolean;
 begin
   Result := true;
+end;
+
+class procedure TWSCustomRichMemo.BeginUpdate(const AWinControl: TWinControl);
+begin
+
+end;
+
+class procedure TWSCustomRichMemo.EndUpdate(const AWinControl: TWinControl);
+begin
+
+end;
+
+class procedure TWSCustomRichMemo.LoadFromChunkArray(
+  const AWinCOntrol: TWinControl; chunks: TRTFChunkArray);
+begin
+
 end;
 
 class function TWSCustomRichMemo.GetStyleRange(const AWinControl: TWinControl;

@@ -16,28 +16,6 @@ function LangConvGet(lang: Integer; var convproc: TEncConvProc): Boolean;
 
 type
 
-  { TRTFParams }
-
-  TRTFParams = class(TObject)
-  public
-    fnt  : TFontParams;
-    pm   : TParaMetric;
-    pa   : TParaAlignment;
-    fnum : Integer; // font index in the font table
-
-    prev : TRTFParams;
-    tabs : TTabStopList;
-    constructor Create(aprev: TRTFParams);
-    procedure ResetDefault;
-    procedure AddTab(AOffset: double; ta: TTabAlignment);
-  end;
-
-  TChunk = record
-    prm: TRTFParams;
-    Text: string;
-    Link: string;
-  end;
-
   { TRTFCustomParser }
 
   TRTFCustomParser = class(TRTFParser)
@@ -80,8 +58,9 @@ type
 
     function DefaultTextColor: TColor;
     procedure PushText; virtual;
+    procedure Consolidate;
   public
-    chunks: array of TChunk;
+    chunks: TRTFChunkArray;
     constructor Create(AStream: TStream);
     destructor Destroy; override;
     procedure StartReading; override;
@@ -267,48 +246,6 @@ function RTFCharToByte(const s: string): byte; inline;
 begin
   // \'hh 	A hexadecimal value, based on the specified character set (may be used to identify 8-bit values).
   Result:=(CharToByte(s[3]) shl 4) or (CharToByte(s[4]));
-end;
-
-{ TRTFParams }
-
-constructor TRTFParams.Create(aprev: TRTFParams);
-begin
-  prev:=aprev;
-  if Assigned(prev) then begin
-    fnt:=prev.fnt;
-    pm:=prev.pm;
-    pa:=prev.pa;
-    fnum:=prev.fnum;
-  end else begin
-    FillChar(fnt, SizeOf(fnt), 0);
-    FillChar(pm, sizeof(pm), 0);
-    pm.LineSpacing:=DefLineSpacing;
-  end;
-end;
-
-procedure TRTFParams.ResetDefault;
-begin
-  // default values are taken from RTF specs
-  // see section "Paragraph Formatting Properties"
-  pa:=paLeft;
-  pm.FirstLine:=0;
-  pm.HeadIndent:=0;
-  pm.TailIndent:=0;
-  pm.SpaceBefore:=0;
-  pm.SpaceAfter:=0;
-  pm.LineSpacing:=0;
-  tabs.Count:=0;
-end;
-
-procedure TRTFParams.AddTab(AOffset: double; ta: TTabAlignment);
-begin
-  if tabs.Count=length(tabs.Tabs) then begin
-    if tabs.Count=0 then SetLength(tabs.Tabs, 4)
-    else SetLength(tabs.Tabs, tabs.Count*2);
-  end;
-  tabs.Tabs[tabs.Count].Offset:=AOffset;
-  tabs.Tabs[tabs.Count].Align:=ta;
-  inc(tabs.Count);
 end;
 
 { TRTFCustomParser }
@@ -607,6 +544,11 @@ begin
     if ResolveHyperlink(b) then
       Chunks[i].Link := b;
   end;
+end;
+
+procedure TRTFCustomParser.Consolidate;
+begin
+
 end;
 
 constructor TRTFCustomParser.Create(AStream: TStream);
