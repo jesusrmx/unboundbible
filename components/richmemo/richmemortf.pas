@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, LCLProc, LCLIntf, LConvEncoding, Graphics,
-  RichMemo, RTFParsPre211;
+  RichMemo, RTFParsPre211, RTFCustomParser;
 
 function MVCParserLoadStream(ARich: TCustomRichMemo; Source: TStream): Boolean;
 procedure RegisterRTFLoader;
@@ -59,61 +59,7 @@ end;
 type
   { TRTFMemoParser }
 
-  { TRTFParams }
-
-  TRTFParams = class(TObject)
-  public
-    fnt  : TFontParams;
-    pm   : TParaMetric;
-    pa   : TParaAlignment;
-    fnum : Integer; // font index in the font table
-
-    prev : TRTFParams;
-    tabs : TTabStopList;
-    constructor Create(aprev: TRTFParams);
-    procedure ResetDefault;
-    procedure AddTab(AOffset: double; ta: TTabAlignment);
-  end;
-
-  TRTFMemoParser = class(TRTFParser)
-  private
-    txtbuf   : String; // keep it UTF8 encoded!
-    txtlen    : Integer;
-
-    HLFromCTable : Boolean;
-
-    prm       : TRTFParams;
-    lang      : Integer;
-    langproc  : TEncConvProc;
-    deflang   : integer;
-
-    skipNextCh: Boolean; // For a Unicode escape the control word \u is used,
-                         // followed by a 16-bit signed decimal integer giving
-                         // the Unicode UTF-16 code unit number. For the benefit
-                         // of programs without Unicode support, this must be followed
-                         // by the nearest representation of this character in the specified code page.
-                         // For example, \u1576? would give the Arabic letter bāʼ ب, specifying that
-                         // older programs which do not have Unicode support should render it as a
-                         // question mark instead.
-
-    procedure AddText(const atext: string);
-    function  ResolveHyperlink(out alinkref: string): boolean;
-  protected
-    procedure classUnk;
-    procedure classText;
-    procedure classControl;
-    procedure classGroup;
-    procedure classEof;
-    procedure doChangePara(aminor, aparam: Integer);
-
-    procedure doDestination(aminor, aparam: Integer);
-    procedure doSpecialChar;
-    procedure doChangeCharAttr(aminor, aparam: Integer);
-
-    procedure SetLanguage(AlangCode: integer);
-
-    function DefaultTextColor: TColor;
-    procedure PushText;
+  TRTFMemoParser = class(TRTFCustomParser)
   public
     Memo  : TCustomRichMemo;
     constructor Create(AMemo: TCustomRichMemo; AStream: TStream);

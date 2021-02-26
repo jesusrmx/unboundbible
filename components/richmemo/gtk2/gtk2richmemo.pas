@@ -111,6 +111,9 @@ type
 
     class procedure SetZoomFactor(const AWinControl: TWinControl; AZoomFactor: Double); override;
 
+    class function LoadRichText(const AWinControl: TWinControl; Source: TStream): Boolean; override;
+    class function SaveRichText(const AWinControl: TWinControl; Dst: TStream): Boolean; override;
+
     // inline handler
     class function InlineInsert(const AWinControl: TWinControl; ATextStart, ATextLength: Integer;
       const ASize: TSize; AHandler: TRichMemoInline; var wsObj: TRichMemoInlineWSObject): Boolean; override;
@@ -1666,6 +1669,18 @@ begin
   gtk_text_buffer_apply_tag(b, tag, @istart, @iend);
 
   //todo: set default font with scale
+end;
+
+class function TGtk2WSCustomRichMemo.LoadRichText(
+  const AWinControl: TWinControl; Source: TStream): Boolean;
+begin
+  Result := false;
+end;
+
+class function TGtk2WSCustomRichMemo.SaveRichText(
+  const AWinControl: TWinControl; Dst: TStream): Boolean;
+begin
+  Result := false;
 end;
 
 function GtkDrawableDraw(widget: PGtkWidget;
