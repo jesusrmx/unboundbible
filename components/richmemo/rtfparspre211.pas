@@ -86,7 +86,7 @@ type
     procedure ResetParser;
     procedure RouteToken;
     procedure SkipGroup;
-    procedure StartReading;
+    procedure StartReading; virtual;
     procedure SetReadHook (Hook : TRTFFuncPtr);
     procedure UngetToken;
     procedure SetToken (Aclass, major, minor, param : Integer; text : string);

@@ -5,133 +5,16 @@ unit RTFCustomParser;
 interface
 
 uses
-  Classes, SysUtils, Graphics, RTFParsPre211;
+  Classes, SysUtils, LConvEncoding, Graphics, RichMemo, RTFParsPre211;
 
 type
-  TVScriptPos = (vpNormal, vpSubScript, vpSuperScript);
+  TEncConvProc = function (const s: string): string;
 
-  TParaAlignment  = (paLeft, paRight, paCenter, paJustify);
-  TParaMetric = record
-    FirstLine   : Double; // in points
-    TailIndent  : Double; // in points
-    HeadIndent  : Double; // in points
-    SpaceBefore : Double; // in points
-    SpaceAfter  : Double; // in points
-    LineSpacing : Double; // multiplier - matching CSS line-height by percentage/em
-                          // note, that normal LineSpacing is 1.2, not 1.0
-  end;
-
-const
-  DefLineSpacing     = 1.2;
-  SingleLineSpacing  = DefLineSpacing;
-  OneHalfLineSpacing = DefLineSpacing * 1.5;
-  DoubleLineSpacing  = DefLineSpacing * 2.0;
-
+//todo: rewrite! it's not language based but fontchar-set based
+procedure LangConvAdd(lang: Integer; convproc: TEncConvProc);
+function LangConvGet(lang: Integer; var convproc: TEncConvProc): Boolean;
 
 type
-  TParaNumStyle   = (pnNone, pnBullet, pnNumber, pnLowLetter
-    , pnLowRoman, pnUpLetter, pnUpRoman, pnCustomChar);
-
-  TParaNumbering  = record
-    Style       : TParaNumStyle;
-    Indent      : Double;
-    CustomChar  : WideChar;
-    NumberStart : Integer;  // used for pnNumber only
-    SepChar     : WideChar;
-    ForceNewNum : Boolean;  // if true and Style is pnNumber, NumberStart is used for the new numbering
-  end;
-
-const
-  SepNone = #0;
-  SepPar  = ')';
-  SepDot  = '.';
-
-
-type
-  TTextModifyMask  = set of (tmm_Color, tmm_Name, tmm_Size, tmm_Styles, tmm_BackColor);
-  TParaModifyMask = set of (pmm_FirstLine, pmm_HeadIndent, pmm_TailIndent, pmm_SpaceBefore, pmm_SpaceAfter, pmm_LineSpacing);
-
-  TSearchOption = (soMatchCase, soWholeWord, soBackward);
-  TSearchOptions = set of TSearchOption;
-
-  TParaRange = record
-    start      : Integer; // the first character in the paragraph
-    lengthNoBr : Integer; // the length of the paragraph, excluding the line break character
-    length     : Integer; // the length of the paragrpah, including the line break, if present
-    // the last line in the control doesn't contain a line break character,
-    // thus length = lengthNoBr
-  end;
-
-type
-  TTabAlignment = (tabLeft, tabCenter, tabRight, tabDecimal, tabWordBar);
-
-  TTabStop = record
-    Offset : Double;
-    Align  : TTabAlignment; // not used
-  end;
-
-  TTabStopList = record
-    Count : Integer;
-    Tabs  : array of TTabStop;
-  end;
-
-type
-  TRectOffsets = record
-    Left   : Double;
-    Top    : Double;
-    Right  : Double;
-    Bottom : Double;
-  end;
-
-  TPrintParams = record
-    JobTitle  : String;       // print job title to be shown in system printing manager
-    Margins   : TRectOffsets; // margins in points
-    SelStart  : Integer;
-    SelLength : Integer;
-  end;
-
-  TPrintMeasure = record
-    Pages     : Integer;
-  end;
-
-  TPrintAction = (paDocStart, paPageStart, paPageEnd, paDocEnd);
-
-  TPrintActionEvent = procedure (Sender: TObject;
-    APrintAction: TPrintAction;
-    PrintCanvas: TCanvas;
-    CurrentPage: Integer; var AbortPrint: Boolean) of object;
-
-type
-  TLinkAction = (laClick);
-
-  TLinkMouseInfo = record
-    Button  : Integer;
-    LinkRef : String;
-  end;
-
-  TLinkActionEvent = procedure (Sender: TObject;
-    ALinkAction: TLinkAction;
-    const info: TLinkMouseInfo;
-    LinkStart, LinkLen: Integer) of object;
-
-  TTextUIFeature = (uiLink);
-  TTextUIFeatures = set of TTextUIFeature;
-
-  TTextUIParam = record
-    features : TTextUIFeatures;
-    linkref  : String;
-  end;
-
-  TFontParams  = record
-    Name      : String;
-    Size      : Integer;
-    Color     : TColor;
-    Style     : TFontStyles;
-    HasBkClr  : Boolean;
-    BkColor   : TColor;
-    VScriptPos  : TVScriptPos;
-  end;
-
 
   { TRTFParams }
 
@@ -167,7 +50,7 @@ type
 
     prm       : TRTFParams;
     lang      : Integer;
-    //langproc  : TEncConvProc;
+    langproc  : TEncConvProc;
     deflang   : integer;
 
     skipNextCh: Boolean; // For a Unicode escape the control word \u is used,
@@ -201,11 +84,175 @@ type
     chunks: array of TChunk;
     constructor Create(AStream: TStream);
     destructor Destroy; override;
-    procedure StartReading;
+    procedure StartReading; override;
   end;
 
 
 implementation
+
+var
+  LangConvTable : array of record lang: integer; proc: TEncConvProc end;
+  LangCount     : Integer = 0;
+
+procedure LangConvAdd(lang: Integer; convproc: TEncConvProc);
+var
+  i  : integer;
+begin
+  for i:=0 to LangCount-1 do
+    if LangConvTable[i].lang=lang then begin
+      LangConvTable[i].proc:=convproc;
+      Exit;
+    end;
+  if LangCount=length(LangConvTable) then begin
+    if LangCount=0 then SetLength(LangConvTable, 64)
+    else SetLength(LangConvTable, LangCount*2);
+  end;
+  LangConvTable[LangCount].lang:=lang;
+  LangConvTable[LangCount].proc:=convproc;
+  inc(LangCount);
+end;
+
+function LangConvGet(lang: Integer; var convproc: TEncConvProc): Boolean;
+var
+  i  : integer;
+begin
+  for i:=0 to LangCount-1 do
+    if LangConvTable[i].lang=lang then begin
+      convproc:=LangConvTable[i].proc;
+      Result:=true;
+      Exit;
+    end;
+  Result:=false;
+end;
+
+procedure LangConvInit;
+begin
+
+  if LangCount>0 then
+    exit;
+
+  LangConvAdd(1052, @CP1250ToUTF8); // Albanian
+  LangConvAdd(1050, @CP1250ToUTF8); // Croatian
+  LangConvAdd(1029, @CP1250ToUTF8); // Czech
+  LangConvAdd(1038, @CP1250ToUTF8); // Hungarian
+  LangConvAdd(1045, @CP1250ToUTF8); // Polish
+  LangConvAdd(1048, @CP1250ToUTF8); // Romanian
+  LangConvAdd(2074, @CP1250ToUTF8); // Serbian - Latin
+  LangConvAdd(1051, @CP1250ToUTF8); // Slovak
+  LangConvAdd(1060, @CP1250ToUTF8); // Slovenian
+
+  LangConvAdd(2092, @CP1251ToUTF8); // Azeri - Cyrillic
+  LangConvAdd(1059, @CP1251ToUTF8); // Belarusian
+  LangConvAdd(1026, @CP1251ToUTF8); // Bulgarian
+  LangConvAdd(1071, @CP1251ToUTF8); // FYRO Macedonia
+  LangConvAdd(1087, @CP1251ToUTF8); // Kazakh
+  LangConvAdd(1088, @CP1251ToUTF8); // Kyrgyz - Cyrillic
+  LangConvAdd(1104, @CP1251ToUTF8); // Mongolian
+  LangConvAdd(1049, @CP1251ToUTF8); // Russian
+  LangConvAdd(3098, @CP1251ToUTF8); // Serbian - Cyrillic
+  LangConvAdd(1092, @CP1251ToUTF8); // Tatar
+  LangConvAdd(1058, @CP1251ToUTF8); // Ukrainian
+  LangConvAdd(2115, @CP1251ToUTF8); // Uzbek - Cyrillic
+
+  LangConvAdd(1078, @CP1252ToUTF8); // Afrikaans
+  LangConvAdd(1069, @CP1252ToUTF8); // Basque
+  LangConvAdd(1027, @CP1252ToUTF8); // Catalan
+  LangConvAdd(1030, @CP1252ToUTF8); // Danish
+  LangConvAdd(2067, @CP1252ToUTF8); // Dutch - Belgium
+  LangConvAdd(1043, @CP1252ToUTF8); // Dutch - Netherlands
+  LangConvAdd(3081, @CP1252ToUTF8); // English - Australia
+  LangConvAdd(10249,@CP1252ToUTF8); // English - Belize
+  LangConvAdd(4105, @CP1252ToUTF8); // English - Canada
+  LangConvAdd(9225, @CP1252ToUTF8); // English - Caribbean
+  LangConvAdd(2057, @CP1252ToUTF8); // English - Great Britain
+  LangConvAdd(6153, @CP1252ToUTF8); // English - Ireland
+  LangConvAdd(8201, @CP1252ToUTF8); // English - Jamaica
+  LangConvAdd(5129, @CP1252ToUTF8); // English - New Zealand
+  LangConvAdd(13321,@CP1252ToUTF8); // English - Phillippines
+  LangConvAdd(7177, @CP1252ToUTF8); // English - Southern Africa
+  LangConvAdd(11273,@CP1252ToUTF8); // English - Trinidad
+  LangConvAdd(1033, @CP1252ToUTF8); // English - United States
+  LangConvAdd(12297,@CP1252ToUTF8); // English - Zimbabwe
+  LangConvAdd(1080, @CP1252ToUTF8); // Faroese
+  LangConvAdd(1035, @CP1252ToUTF8); // Finnish
+  LangConvAdd(2060, @CP1252ToUTF8); // French - Belgium
+  LangConvAdd(3084, @CP1252ToUTF8); // French - Canada
+  LangConvAdd(1036, @CP1252ToUTF8); // French - France
+  LangConvAdd(5132, @CP1252ToUTF8); // French - Luxembourg
+  LangConvAdd(6156, @CP1252ToUTF8); // French - Monaco
+  LangConvAdd(4108, @CP1252ToUTF8); // French - Switzerland
+  LangConvAdd(1110, @CP1252ToUTF8); // Galician
+  LangConvAdd(3079, @CP1252ToUTF8); // German - Austria
+  LangConvAdd(1031, @CP1252ToUTF8); // German - Germany
+  LangConvAdd(5127, @CP1252ToUTF8); // German - Liechtenstein
+  LangConvAdd(4103, @CP1252ToUTF8); // German - Luxembourg
+  LangConvAdd(2055, @CP1252ToUTF8); // German - Switzerland
+  LangConvAdd(1039, @CP1252ToUTF8); // Icelandic
+  LangConvAdd(1057, @CP1252ToUTF8); // Indonesian
+  LangConvAdd(1040, @CP1252ToUTF8); // Italian - Italy
+  LangConvAdd(2064, @CP1252ToUTF8); // Italian - Switzerland
+  LangConvAdd(2110, @CP1252ToUTF8); // Malay - Brunei
+  LangConvAdd(1086, @CP1252ToUTF8); // Malay - Malaysia
+  LangConvAdd(1044, @CP1252ToUTF8); // Norwegian - Bokml
+  LangConvAdd(2068, @CP1252ToUTF8); // Norwegian - Nynorsk
+  LangConvAdd(1046, @CP1252ToUTF8); // Portuguese - Brazil
+  LangConvAdd(2070, @CP1252ToUTF8); // Portuguese - Portugal
+  LangConvAdd(1274, @CP1252ToUTF8); // Spanish - Argentina
+  LangConvAdd(16394,@CP1252ToUTF8); // Spanish - Bolivia
+  LangConvAdd(13322,@CP1252ToUTF8); // Spanish - Chile
+  LangConvAdd(9226, @CP1252ToUTF8); // Spanish - Colombia
+  LangConvAdd(5130, @CP1252ToUTF8); // Spanish - Costa Rica
+  LangConvAdd(7178, @CP1252ToUTF8); // Spanish - Dominican Republic
+  LangConvAdd(12298,@CP1252ToUTF8); // Spanish - Ecuador
+  LangConvAdd(17418,@CP1252ToUTF8); // Spanish - El Salvador
+  LangConvAdd(4106, @CP1252ToUTF8); // Spanish - Guatemala
+  LangConvAdd(18442,@CP1252ToUTF8); // Spanish - Honduras
+  LangConvAdd(2058, @CP1252ToUTF8); // Spanish - Mexico
+  LangConvAdd(19466,@CP1252ToUTF8); // Spanish - Nicaragua
+  LangConvAdd(6154, @CP1252ToUTF8); // Spanish - Panama
+  LangConvAdd(15370,@CP1252ToUTF8); // Spanish - Paraguay
+  LangConvAdd(10250,@CP1252ToUTF8); // Spanish - Peru
+  LangConvAdd(20490,@CP1252ToUTF8); // Spanish - Puerto Rico
+  LangConvAdd(1034, @CP1252ToUTF8); // Spanish - Spain (Traditional)
+  LangConvAdd(14346,@CP1252ToUTF8); // Spanish - Uruguay
+  LangConvAdd(8202, @CP1252ToUTF8); // Spanish - Venezuela
+  LangConvAdd(1089, @CP1252ToUTF8); // Swahili
+  LangConvAdd(2077, @CP1252ToUTF8); // Swedish - Finland
+  LangConvAdd(1053, @CP1252ToUTF8); // Swedish - Sweden
+
+  LangConvAdd(1032, @CP1253ToUTF8); // greek
+
+  LangConvAdd(1068, @CP1254ToUTF8); // Azeri - Latin
+  LangConvAdd(1055, @CP1254ToUTF8); // turkish
+  LangConvAdd(1091, @CP1254ToUTF8); // Uzbek - Latin
+
+  LangConvAdd(1037, @CP1255ToUTF8); // hebrew
+
+  LangConvAdd(5121, @CP1256ToUTF8); // Arabic - Algeria
+  LangConvAdd(15361,@CP1256ToUTF8); // Arabic - Bahrain
+  LangConvAdd(3073, @CP1256ToUTF8); // Arabic - Egypt
+  LangConvAdd(2049, @CP1256ToUTF8); // Arabic - Iraq
+  LangConvAdd(11265,@CP1256ToUTF8); // Arabic - Jordan
+  LangConvAdd(13313,@CP1256ToUTF8); // Arabic - Kuwait
+  LangConvAdd(12289,@CP1256ToUTF8); // Arabic - Lebanon
+  LangConvAdd(4097, @CP1256ToUTF8); // Arabic - Libya
+  LangConvAdd(6145, @CP1256ToUTF8); // Arabic - Morocco
+  LangConvAdd(8193, @CP1256ToUTF8); // Arabic - Oman
+  LangConvAdd(16385,@CP1256ToUTF8); // Arabic - Qatar
+  LangConvAdd(1025, @CP1256ToUTF8); // Arabic - Saudi Arabia
+  LangConvAdd(10241,@CP1256ToUTF8); // Arabic - Syria
+  LangConvAdd(7169, @CP1256ToUTF8); // Arabic - Tunisia
+  LangConvAdd(14337,@CP1256ToUTF8); // Arabic - United Arab Emirates
+  LangConvAdd(9217, @CP1256ToUTF8); // Arabic - Yemen
+  LangConvAdd(1065, @CP1256ToUTF8); // Farsi - Persian
+  LangConvAdd(1056, @CP1256ToUTF8); // Urdu
+
+  LangConvAdd(1061, @CP1257ToUTF8); // Estonian
+  LangConvAdd(1062, @CP1257ToUTF8); // Latvian
+  LangConvAdd(1063, @CP1257ToUTF8); // Lithuanian
+
+  LangConvAdd(1066, @CP1258ToUTF8); // vietnam
+end;
 
 function CharToByte(const ch: AnsiChar): Byte;
 begin
@@ -334,11 +381,11 @@ begin
   txt:=Self.GetRtfText;
 
   if (length(txt)=4) and (txt[1]='\') and (txt[2]=#39) then begin
-    //if Assigned(langproc) then begin
-    //  bt:=char(RTFCharToByte(txt));
-    //
-    //  AddText( langproc(bt) );
-    //end;
+    if Assigned(langproc) then begin
+      bt:=char(RTFCharToByte(txt));
+
+      AddText( langproc(bt) );
+    end;
   end else if (length(txt)=2) and (txt[1]='\') and (txt[2] in ['\','{','}']) then begin
     AddText(txt[2]);
   end else begin
@@ -515,8 +562,8 @@ end;
 procedure TRTFCustomParser.SetLanguage(AlangCode: integer);
 begin
   lang:=AlangCode;
-  //langproc:=nil;
-  //LangConvGet(lang, langproc);
+  langproc:=nil;
+  LangConvGet(lang, langproc);
 end;
 
 function TRTFCustomParser.DefaultTextColor: TColor;
@@ -527,9 +574,7 @@ end;
 procedure TRTFCustomParser.PushText;
 var
   i     : Integer;
-  len   : Integer;
   pf    : PRTFFONT;
-  selst : Integer;
   b     : string;
 begin
   if not Assigned(prm) then exit;

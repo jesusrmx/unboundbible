@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, LCLProc, LCLIntf, LConvEncoding, Graphics,
-  RichMemo, RTFParsPre211, RTFCustomParser;
+  RichMemo, RTFCustomParser;
 
 function MVCParserLoadStream(ARich: TCustomRichMemo; Source: TStream): Boolean;
 procedure RegisterRTFLoader;
@@ -63,8 +63,7 @@ type
   public
     Memo  : TCustomRichMemo;
     constructor Create(AMemo: TCustomRichMemo; AStream: TStream);
-    destructor Destroy; override;
-    procedure StartReading;
+    procedure StartReading; override;
   end;
 
 function LangConvGet(lang: Integer; var convproc: TEncConvProc): Boolean;
@@ -205,104 +204,6 @@ begin
   LangConvAdd(1066, @CP1258ToUTF8); // vietnam
 end;
 
-{ TRTFParams }
-
-constructor TRTFParams.Create(aprev: TRTFParams);
-begin
-  prev:=aprev;
-  if Assigned(prev) then begin
-    fnt:=prev.fnt;
-    pm:=prev.pm;
-    pa:=prev.pa;
-    fnum:=prev.fnum;
-  end else begin
-    InitFontParams(fnt);
-    InitParaMetric(pm)
-  end;
-end;
-
-procedure TRTFParams.ResetDefault;
-begin
-  // default values are taken from RTF specs
-  // see section "Paragraph Formatting Properties"
-  pa:=paLeft;
-  pm.FirstLine:=0;
-  pm.HeadIndent:=0;
-  pm.TailIndent:=0;
-  pm.SpaceBefore:=0;
-  pm.SpaceAfter:=0;
-  pm.LineSpacing:=0;
-  tabs.Count:=0;
-end;
-
-procedure TRTFParams.AddTab(AOffset: double; ta: TTabAlignment);
-begin
-  if tabs.Count=length(tabs.Tabs) then begin
-    if tabs.Count=0 then SetLength(tabs.Tabs, 4)
-    else SetLength(tabs.Tabs, tabs.Count*2);
-  end;
-  tabs.Tabs[tabs.Count].Offset:=AOffset;
-  tabs.Tabs[tabs.Count].Align:=ta;
-  inc(tabs.Count);
-end;
-
-{ TRTFMemoParserr }
-
-procedure TRTFMemoParser.AddText(const atext: string);
-var
-  nl : Integer;
-  l  : Integer;
-begin
-  nl:=txtlen+length(atext);
-  if nl>length(txtbuf) then begin
-    l:=length(txtbuf);
-    while l<nl do
-      if l=0 then l:=256
-      else l:=l*2;
-    SetLength(txtbuf, l);
-  end;
-  Move(atext[1], txtbuf[txtlen+1], length(atext));
-  inc(txtlen, length(atext));
-end;
-
-function TRTFMemoParser.ResolveHyperlink(out alinkref: string): boolean;
-var
-  p: SizeInt;
-begin
-  result := (Field.valid);
-  if result then begin
-    p := pos('HYPERLINK', Field.rtfFieldInst);
-    result := p>0;
-    if result then begin
-      aLinkref := Trim(copy(Field.rtfFieldInst, p + 9, Length(Field.rtfFieldInst)));
-      p := 1;
-      if (aLinkRef<>'') and (aLinkref[p] in ['"','''']) then Delete(aLinkRef, p, 1);
-      p := Length(aLinkref);
-      if (aLinkRef<>'') and (aLinkref[p] in ['"','''']) then Delete(aLinkRef, p, 1);
-    end;
-  end;
-end;
-
-procedure TRTFMemoParser.classUnk;
-var
-  txt : string;
-  ws : UnicodeString;
-begin
-  if not Assigned(prm) then exit;
-
-  txt:=GetRtfText;
-  if (txt='\object') then begin
-    SkipGroup;
-    Exit;
-  end;
-  if (length(txt)>2) and (txt[1]='\') and (txt[2]='u') and (txt[3] in ['0'..'9']) then begin
-    SetLength(Ws,1);
-    ws[1]:=UnicodeChar(rtfParam);
-    AddText( UTF8Encode(ws) );
-    skipNextCh:=true;
-  end; 
-end;
-
 function CharToByte(const ch: AnsiChar): Byte;
 begin
   Result:=0;
@@ -317,265 +218,7 @@ begin
   Result:=(CharToByte(s[3]) shl 4) or (CharToByte(s[4]));
 end;
 
-procedure TRTFMemoParser.classText;
-var
-  txt : string;
-  bt  : Char;
-begin
-  if not Assigned(prm) then exit;
-  if skipNextCh then begin
-    skipNextCh:=false;
-    Exit;
-  end;
-
-  txt:=Self.GetRtfText;
-
-  if (length(txt)=4) and (txt[1]='\') and (txt[2]=#39) then begin
-    if Assigned(langproc) then begin
-      bt:=char(RTFCharToByte(txt));
-
-      AddText( langproc(bt) );
-    end;
-  end else if (length(txt)=2) and (txt[1]='\') and (txt[2] in ['\','{','}']) then begin
-    AddText(txt[2]);
-  end else begin
-    AddText(txt);
-  end;
-end;
-
-procedure TRTFMemoParser.classControl;
-begin
-  if not Assigned(prm) then exit;
-
-  if txtlen>0 then begin
-    PushText;
-  end;
-  //writeln('ctrl: ', rtfClass,' ', rtfMajor, ' ', Self.GetRtfText, ' ',rtfMinor,' ', rtfParam);
-  case rtfMajor of
-    rtfDestination: doDestination(rtfMinor, rtfParam);
-    rtfSpecialChar: doSpecialChar;
-    rtfCharAttr: doChangeCharAttr(rtfMinor, rtfParam);
-    rtfParAttr: doChangePara(rtfMinor, rtfParam);
-  end;
-end;
-
-procedure TRTFMemoParser.classGroup;
-var
-  t : TRTFParams;
-begin
-  if not Assigned(prm) then exit;
-
-  case rtfMajor of
-    rtfBeginGroup: begin
-      t:=TRTFParams.Create(prm);
-      prm:=t;
-    end;
-    rtfEndGroup: begin
-      if Assigned(prm) then begin
-        t:=prm.prev;
-        prm.Free;
-        prm:=t;
-      end;
-    end;
-  end;
-end;
-
-procedure TRTFMemoParser.classEof;
-begin
-  PushText;
-end;
-
-procedure TRTFMemoParser.doDestination(aminor, aparam: Integer);
-begin
-  case aminor of
-    rtfDefaultLanguage:
-      deflang:=aparam;
-  end;
-end;
-
-procedure TRTFMemoParser.doChangePara(aminor, aparam: Integer);
-const
-  TabAl : array [rtfTabPos..rtfTabDecimal] of TTabAlignment = (
-    tabLeft, tabRight, tabCenter, tabDecimal);
-begin
-  case aminor of
-    rtfParDef:      prm.ResetDefault; // reset clear formatting
-    rtfQuadLeft:    prm.pa:=paLeft;
-    rtfQuadRight:   prm.pa:=paRight;
-    rtfQuadJust:    prm.pa:=paJustify;
-    rtfQuadCenter:  prm.pa:=paCenter;
-    rtfFirstIndent: begin
-      prm.pm.FirstLine:=aparam / 20;
-    end;
-    rtfLeftIndent: begin
-      prm.pm.HeadIndent:=aparam / 20;
-    end;
-    rtfRightIndent:  prm.pm.TailIndent  := aparam / 20;
-    rtfSpaceBefore:  prm.pm.SpaceBefore := aparam / 20;
-    rtfSpaceAfter:   prm.pm.SpaceAfter  := aparam / 20;
-    rtfSpaceBetween: prm.pm.LineSpacing := aparam / 200;
-      // \slN - surprise! the "line spacing" is actually a multiplier based on the FONT size, not linesize
-      // where linesize = fontsize * 1.2
-    rtfLanguage: begin
-      SetLanguage(rtfParam);
-    end;
-    rtfTabPos,//; rtfKstr : 'tx'; rtfkHash : 0),
-    rtfTabRight, // rtfKstr : 'tqr'; rtfkHash : 0),
-    rtfTabCenter, //; rtfKstr : 'tqc'; rtfkHash : 0),
-    rtfTabDecimal: //; rtfKstr : 'tqdec'; rtfkHash : 0),
-      prm.AddTab(aparam / 20, TabAl[aminor]);
-  end;
-end;
-
-procedure TRTFMemoParser.doSpecialChar;
-const
-  {$ifdef MSWINDOWS}
-  CharPara = #13#10;
-  {$else}
-  CharPara = #10;
-  {$endif}
-  CharTab  = #9;
-  CharLine = #13;
-begin
-  case rtfMinor of
-    rtfOptDest: SkipGroup;
-    rtfLine: AddText(CharLine);
-    rtfPar:  begin
-      AddText(CharPara);
-      if deflang<>0 then
-        SetLanguage(deflang);
-    end;
-    rtfTab:  AddText(CharTab);
-  end;
-end;
-
-procedure TRTFMemoParser.doChangeCharAttr(aminor, aparam: Integer);
-var
-  p : PRTFColor;
-const
-  HColor : array [1..16] of TColor = (
-    clBlack
-    ,clBlue
-    ,clAqua // Cyan
-    ,clLime // Green
-    ,clFuchsia  //Magenta
-    ,clRed
-    ,clYellow
-    ,clGray // unused!
-    ,clNavy // DarkBlue
-    ,clTeal // DarkCyan
-    ,clGreen  // DarkGreen
-    ,clPurple // clDarkMagenta
-    ,clMaroon // clDarkRed
-    ,clOlive // clDarkYellow
-    ,clGray  //clDarkGray
-    ,clSilver //clLightGray
-  );
-begin
-  case aminor of
-    rtfPlain: prm.fnt.Style:=[];
-    rtfBold: if aparam=0 then Exclude(prm.fnt.Style,fsBold)  else Include(prm.fnt.Style, fsBold);
-    rtfItalic: if aparam=0 then Exclude(prm.fnt.Style,fsItalic)  else Include(prm.fnt.Style, fsItalic);
-    rtfStrikeThru: if aparam=0 then Exclude(prm.fnt.Style,fsStrikeOut)  else Include(prm.fnt.Style, fsStrikeOut);
-    rtfFontNum: prm.fnum:=aparam;
-    rtfFontSize: prm.fnt.Size:=round(aparam/2);
-    rtfUnderline: if aparam=0 then Exclude(prm.fnt.Style,fsUnderline)  else Include(prm.fnt.Style, fsUnderline);
-    rtfNoUnderline: Exclude(prm.fnt.Style, fsUnderline);
-
-    rtfSuperScript: prm.fnt.VScriptPos:=vpSuperscript;
-    rtfSubScript  : prm.fnt.VScriptPos:=vpSubScript;
-    rtfNoSuperSub : prm.fnt.VScriptPos:=vpNormal;
-
-    rtfHighlight: begin
-      prm.fnt.HasBkClr := (aparam>0) and (aparam<=high(HColor));
-      if prm.fnt.HasBkClr then begin
-        if HLFromCTable then prm.fnt.BkColor:=HColor[aparam]
-        else begin
-          p:=Colors[aparam];
-          if Assigned(p) then prm.fnt.BkColor:=RGBToColor(p^.rtfCRed, p^.rtfCGreen, p^.rtfCBlue)
-          // fallback?
-          else prm.fnt.BkColor:=HColor[aparam];
-        end;
-      end;
-    end;
-    rtfForeColor: begin
-      if rtfParam<>0 then p:=Colors[rtfParam]
-      else p:=nil;
-      if not Assigned(p) then
-        prm.fnt.Color:=DefaultTextColor
-      else
-        prm.fnt.Color:=RGBToColor(p^.rtfCRed, p^.rtfCGreen, p^.rtfCBlue);
-    end;
-  end;
-end;
-
-procedure TRTFMemoParser.SetLanguage(AlangCode: integer);
-begin
-  lang:=AlangCode;
-  langproc:=nil;
-  LangConvGet(lang, langproc);
-end;
-
-function TRTFMemoParser.DefaultTextColor:TColor;
-begin
-  Result:=ColorToRGB(Memo.Font.Color);
-end;
-
-procedure TRTFMemoParser.PushText;
-var
-  len   : Integer;
-  pf    : PRTFFONT;
-  selst : Integer;
-  b     : string;
-begin
-  if not Assigned(prm) then exit;
-  if txtlen=0 then Exit;
-
-  b:=Copy(txtbuf, 1, txtlen);
-  len:=UTF8Length(b);
-
-  txtlen:=0;
-  txtbuf:='';
-  if len=0 then Exit;
-
-  Memo.SelStart:=MaxInt;
-  selst:=Memo.SelStart;
-  // in order to get the start selection, we need to switch to the last character
-  // and then get the value. SelStart doesn't match GetTextLen, since
-  // "StartSel" is based on number of visible characters (i.e. line break is 1 character)
-  // while GetTextLen is based on number of actual string characters
-  // selst:=Memo.GetTextLen;
-
-  Memo.SelStart:=selst;
-  Memo.SelLength:=0;
-  Memo.SelText:=b;
-
-  if Assigned(prm) then begin
-    prm.pm.FirstLine:=prm.pm.HeadIndent+prm.pm.FirstLine;
-    Memo.SetParaMetric(selst, 1, prm.pm );
-    prm.pm.FirstLine:=prm.pm.FirstLine-prm.pm.HeadIndent;
-
-    Memo.SetParaAlignment(selst, 1, prm.pa );
-
-    if prm.tabs.Count>0 then
-      Memo.SetParaTabs(selst, 1, prm.tabs);
-  end;
-
-//  Memo.GetTextAttributes(selst, font);
-  pf:=Fonts[prm.fnum];
-  if Assigned(pf) then prm.fnt.Name:=pf^.rtfFName;
-  //prm.fnt.Size:=round(fsz);
-  //prm.fnt.Style:=fst;
-  //prm.fnt.Color:=ColorToRGB(fColor);
-  //prm.fnt.HasBkClr:=hasbk;
-  //prm.fnt.BkColor:=bcolor;
-  Memo.SetTextAttributes(selst, len, prm.fnt);
-
-  if Field.valid then begin
-    if ResolveHyperlink(b) then
-      Memo.SetLink(selst, len, true, b);
-  end;
-end;
+{ TRTFMemoParserr }
 
 constructor TRTFMemoParser.Create(AMemo:TCustomRichMemo;AStream:TStream);
 begin
@@ -583,40 +226,12 @@ begin
   Memo:=AMemo;
 end;
 
-destructor TRTFMemoParser.Destroy;
-var
-  t: TRTFParams;
-begin
-  // cleanup
-  while Assigned(prm) do begin
-    t:=prm;
-    prm:=prm.prev;
-    t.Free;
-  end;
-  inherited Destroy;
-end;
-
 procedure TRTFMemoParser.StartReading;
-var
-  t : TRTFParams;
 begin
   Memo.Lines.BeginUpdate;
   try
 
-    prm:=TRTFParams.Create(nil);
-    prm.fnt.Size:=12; //\fsN Font size in half-points (the default is 24).
-    prm.fnum:=0;
-    prm.ResetDefault;
-
     inherited StartReading;
-    PushText;
-
-    // clear the stack, if overflow
-    while Assigned(prm) do begin
-      t:=prm.prev;
-      prm.Free;
-      prm:=t;
-    end;
 
     Memo.SelStart:=0;
     Memo.SelLength:=0;
