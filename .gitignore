@@ -23,3 +23,6 @@ components/richmemo/ide/lib/*
 components/unboundmemo/lib/*
 components/unboundmemo/backup/*
 unboundbible
+*.bak*
+*.diff
+*.rtf*
