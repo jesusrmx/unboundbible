@@ -41,7 +41,7 @@ type
   { TRTFCustomParser }
 
   TRTFCustomParser = class(TRTFParser)
-  private
+  protected
     defColor : TColor;
     txtbuf   : String; // keep it UTF8 encoded!
     txtlen    : Integer;
@@ -79,7 +79,7 @@ type
     procedure SetLanguage(AlangCode: integer);
 
     function DefaultTextColor: TColor;
-    procedure PushText;
+    procedure PushText; virtual;
   public
     chunks: array of TChunk;
     constructor Create(AStream: TStream);
@@ -87,6 +87,7 @@ type
     procedure StartReading; override;
   end;
 
+  procedure LangConvInit;
 
 implementation
 
