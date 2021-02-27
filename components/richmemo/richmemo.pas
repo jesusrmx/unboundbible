@@ -584,7 +584,7 @@ end;
 function TRTFParams.Equal(prm: TRTFParams): boolean;
 begin
   result := pa=prm.pa;
-  if not result then begin
+  if result then begin
     result :=
       (fnt.Name=prm.fnt.Name) and
       (fnt.Size=prm.fnt.Size) and

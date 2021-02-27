@@ -5,7 +5,7 @@ unit RTFCustomParser;
 interface
 
 uses
-  Classes, SysUtils, LConvEncoding, Graphics, RichMemo, RTFParsPre211;
+  Classes, SysUtils, LazLogger, LazUTF8, LConvEncoding, Graphics, RichMemo, RTFParsPre211;
 
 type
   TEncConvProc = function (const s: string): string;
@@ -59,6 +59,7 @@ type
     function DefaultTextColor: TColor;
     procedure PushText; virtual;
     procedure Consolidate;
+    procedure DumpChunks;
   public
     chunks: TRTFChunkArray;
     constructor Create(AStream: TStream);
@@ -551,13 +552,17 @@ var
   track: array of boolean;
   i, last: Integer;
 begin
+
+  DumpChunks;
+
   last := 0;
   SetLength(track, length(chunks));
-  track[0] := false
+  track[0] := false;
   for i:=1 to Length(chunks)-1 do begin
     // todo: this comparison should be made in the type of chunk[]
-    if (Chunks[i].Link=Chunks[last].Link) and (Chunks[i].prm.Equal(Chunks[i].prm)) then begin
+    if (Chunks[i].Link=Chunks[last].Link) and (Chunks[i].prm.Equal(Chunks[Last].prm)) then begin
       Chunks[last].Text := Chunks[last].Text + Chunks[i].Text;
+      Chunks[i].prm.Free;
       Track[i] := true
     end else begin
       last := i;
@@ -566,13 +571,61 @@ begin
   end;
 
   //WriteLn('Chunks Before consolidate: ', Length(Chunks));
-  for i:=length(track)-1 downto 0 begin
+  last := 0;
+  i := length(track)-1;
+  while i>=0 do begin
     if Track[i] then begin
-      Chunks[i].prm.Free;
-      Delete(Chunks, i, 1);
+      //if i=0 then Error('Error, first element should not be deleted');
+      inc(last)
+    end else if (last>0) then begin
+      delete(chunks, i+1, last);
+      last := 0;
     end;
+    dec(i);
   end;
   //WriteLn('Chunks After consolidate: ', Length(Chunks));
+  DumpChunks;
+end;
+
+procedure TRTFCustomParser.DumpChunks;
+var
+  i, Offset: Integer;
+  len: PtrInt;
+begin
+  Offset := 0;
+  WriteLn;
+  WriteLn('Found: ', Length(Chunks),' Chunks');
+  for i:=0 to Length(Chunks)-1 do begin
+    with Chunks[i] do begin
+      len := UTF8Length(Text);
+      WriteLn;
+      WriteLn(' Chunk: ', i);
+      WriteLn('Offset: ', offset);
+      WriteLn('   Len: ', len);
+      WriteLn('  Text: ', DbgStr(Text));
+      WriteLn('  Link: ', Link);
+      Write  ('  Font: ', prm.fnt.Name,',',prm.fnt.Size,',',ColorToString(prm.fnt.Color));
+      if fsBold in prm.fnt.Style then Write(' bold');
+      if fsItalic in prm.fnt.Style then Write(' italic');
+      if fsUnderline in prm.fnt.Style then Write(' underline');
+      WriteLn;
+      Write('Alignment: ');
+      case prm.pa of
+        paLeft: WriteLn('Left');
+        paRight: WriteLn('Right');
+        paCenter: WriteLn('Center');
+        paJustify: WriteLn('Justify');
+      end;
+      WriteLn('ParMetric:');
+      WriteLn('  FirstLine: ', FloatToStr(prm.pm.FirstLine));
+      WriteLn(' TailIndent: ', FloatToStr(prm.pm.TailIndent));
+      WriteLn(' HeadIndent: ', FloatToStr(prm.pm.HeadIndent));
+      WriteLn('SpaceBefore: ', FloatToStr(prm.pm.SpaceBefore));
+      WriteLn(' SpaceAfter: ', FloatToStr(prm.pm.SpaceAfter));
+      WriteLn('LineSpacing: ', FloatToStr(prm.pm.LineSpacing));
+      offset := offset + len;
+    end;
+  end;
 end;
 
 constructor TRTFCustomParser.Create(AStream: TStream);

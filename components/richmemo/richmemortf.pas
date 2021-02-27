@@ -33,6 +33,7 @@ type
   TRTFMemoParser = class(TRTFCustomParser)
   private
     fFast: boolean;
+    procedure LoadFromChunks;
   protected
     procedure PushText; override;
   public
@@ -43,6 +44,62 @@ type
   end;
 
 { TRTFMemoParserr }
+
+procedure TRTFMemoParser.LoadFromChunks;
+var
+  offset, i, len: Integer;
+begin
+  Memo.Lines.BeginUpdate;
+  try
+    offset := 0;
+    for i:=0 to Length(Chunks)-1 do begin
+
+      len := UTF8Length(Chunks[i].Text);
+      Memo.SelStart := offset;
+      Memo.SelText := Chunks[i].Text;
+
+      Memo.SetTextAttributes(offset, len, Chunks[i].prm.fnt);
+
+      inc(offset, len);
+      {
+      memo.SetParaMetric(ofset, );
+
+      Memo.InDelText();
+      Memo.SelStart:=selst;
+      Memo.SelLength:=0;
+      Memo.SelText:=b;
+
+      if Assigned(prm) then begin
+        prm.pm.FirstLine:=prm.pm.HeadIndent+prm.pm.FirstLine;
+        Memo.SetParaMetric(selst, 1, prm.pm );
+        prm.pm.FirstLine:=prm.pm.FirstLine-prm.pm.HeadIndent;
+
+        Memo.SetParaAlignment(selst, 1, prm.pa );
+
+        if prm.tabs.Count>0 then
+          Memo.SetParaTabs(selst, 1, prm.tabs);
+      end;
+
+    //  Memo.GetTextAttributes(selst, font);
+      pf:=Fonts[prm.fnum];
+      if Assigned(pf) then prm.fnt.Name:=pf^.rtfFName;
+      //prm.fnt.Size:=round(fsz);
+      //prm.fnt.Style:=fst;
+      //prm.fnt.Color:=ColorToRGB(fColor);
+      //prm.fnt.HasBkClr:=hasbk;
+      //prm.fnt.BkColor:=bcolor;
+      Memo.SetTextAttributes(selst, len, prm.fnt);
+
+      if Field.valid then begin
+        if ResolveHyperlink(b) then
+          Memo.SetLink(selst, len, true, b);
+      end;
+      }
+    end;
+  finally
+    Memo.Lines.EndUpdate;
+  end;
+end;
 
 procedure TRTFMemoParser.PushText;
 var
@@ -117,9 +174,10 @@ begin
   if fFast then begin
     inherited StartReading;
     Consolidate;
-    Memo.BeginUpdate;
-    Memo.LoadFromChunkArray(Chunks);
-    Memo.EndUpdate;
+    LoadFromChunks;
+    //Memo.BeginUpdate;
+    //Memo.LoadFromChunkArray(Chunks);
+    //Memo.EndUpdate;
   end else begin
     Memo.Lines.BeginUpdate;
     try
@@ -140,6 +198,7 @@ begin
   if not Result then Exit;
 
   p:=TRTFMemoParser.Create(ARich, Source);
+  p.Fast := true;
   try
     p.StartReading;
   finally
