@@ -258,11 +258,11 @@ object MainForm: TMainForm
   end
   object PanelLeft: TPanel
     Left = 0
-    Height = 326
+    Height = 327
     Top = 32
     Width = 195
     Align = alLeft
-    ClientHeight = 326
+    ClientHeight = 327
     ClientWidth = 195
     Font.CharSet = GREEK_CHARSET
     Font.Color = clWindowText
@@ -279,7 +279,6 @@ object MainForm: TMainForm
       ItemHeight = 0
       OnClick = BookBoxClick
       ParentFont = False
-      ScrollWidth = 132
       TabOrder = 0
     end
     object ChapterBox: TListBox
@@ -292,7 +291,6 @@ object MainForm: TMainForm
       ItemHeight = 0
       OnClick = ChapterBoxClick
       ParentFont = False
-      ScrollWidth = 43
       TabOrder = 1
     end
     object ComboBox: TComboBox
@@ -303,7 +301,7 @@ object MainForm: TMainForm
       DropDownCount = 12
       Font.Color = clWindowText
       Font.Height = -13
-      ItemHeight = 17
+      ItemHeight = 25
       OnChange = ComboBoxChange
       OnDrawItem = ComboBoxDrawItem
       ParentFont = False
@@ -313,8 +311,8 @@ object MainForm: TMainForm
   end
   object StatusBar: TStatusBar
     Left = 0
-    Height = 23
-    Top = 358
+    Height = 22
+    Top = 359
     Width = 937
     Panels = <>
     ParentShowHint = False
@@ -322,7 +320,7 @@ object MainForm: TMainForm
   end
   object PageControl: TPageControl
     Left = 200
-    Height = 326
+    Height = 327
     Top = 32
     Width = 737
     ActivePage = TabSheetBible
@@ -335,17 +333,17 @@ object MainForm: TMainForm
     OnChange = PageControlChange
     object TabSheetBible: TTabSheet
       Caption = 'Bible'
-      ClientHeight = 296
-      ClientWidth = 729
+      ClientHeight = 293
+      ClientWidth = 733
       Font.Color = clWindowText
       Font.Height = -12
       ParentFont = False
       object MemoBible: TUnboundMemo
         Cursor = crArrow
         Left = 0
-        Height = 296
+        Height = 293
         Top = 0
-        Width = 729
+        Width = 733
         Align = alClient
         Font.Color = clWindowText
         Font.Height = -16
@@ -534,7 +532,7 @@ object MainForm: TMainForm
   end
   object Splitter: TSplitter
     Left = 195
-    Height = 326
+    Height = 327
     Top = 32
     Width = 5
   end

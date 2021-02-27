@@ -1371,9 +1371,15 @@ begin
 end;
 
 procedure TMainForm.PerformFileOpen(const FileName: string);
+var
+  ti, tf: QWord;
 begin
   if not FileExists(FileName) then Exit;
+  ti := GetTickCount64;
+  MemoNotes.LoadingMode := lmFast;
   MemoNotes.LoadFromFile(FileName);
+  tf := GetTickCount64;
+  WriteLn('It Took: ', tf-ti,' ms');
   NoteFileName := FileName;
   RebuildRecentList;
   SelectPage(apNotes);

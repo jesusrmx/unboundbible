@@ -108,6 +108,9 @@ type
   end;
 
 type
+  TLoadingMode = (lmDefault, lmFast, lmWidgetset);
+
+type
   TRectOffsets = record
     Left   : Double;
     Top    : Double;
@@ -208,6 +211,7 @@ type
     fOnLinkAction       : TLinkActionEvent;
     fZoomFactor         : Double;
   private
+    fLoadingMode: TLoadingMode;
     procedure InlineInvalidate(handler: TRichMemoInline);
 
     //todo: PrintMeasure doesn't work propertly
@@ -297,6 +301,7 @@ type
     property OnPrintAction: TPrintActionEvent read fOnPrintAction write fOnPrintAction;
     property OnLinkAction: TLinkActionEvent read fOnLinkAction write fOnLinkAction;
     property CanRedo: Boolean read GetCanRedo;
+    property LoadingMode: TLoadingMode read fLoadingMode write fLoadingMode;
   end;
   
   { TRichMemo }
@@ -388,7 +393,7 @@ procedure InitPrintParams(var prm: TPrintParams);
 procedure InitTextUIParams(var prm: TTextUIParam);
 
 var
-  RTFLoadStream : function (AMemo: TCustomRichMemo; Source: TStream): Boolean = nil;
+  RTFLoadStream : function (AMemo: TCustomRichMemo; Source: TStream; mode:TLoadingMode=lmDefault): Boolean = nil;
   RTFSaveStream : function (AMemo: TCustomRichMemo; Dest: TStream): Boolean = nil;
 
 implementation
@@ -1102,7 +1107,7 @@ begin
       Self.Lines.BeginUpdate;
       try
         Self.Lines.Clear;
-        Result:=RTFLoadStream(Self, Source);
+        Result:=RTFLoadStream(Self, Source, LoadingMode);
       finally
         Self.Lines.EndUpdate;
       end;

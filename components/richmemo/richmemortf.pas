@@ -8,7 +8,7 @@ uses
   Classes, SysUtils, LCLProc, LCLIntf, LConvEncoding, Graphics,
   RichMemo, RTFParsPre211, RTFCustomParser;
 
-function MVCParserLoadStream(ARich: TCustomRichMemo; Source: TStream): Boolean;
+function MVCParserLoadStream(ARich: TCustomRichMemo; Source: TStream; mode:TLoadingMode=lmDefault): Boolean;
 procedure RegisterRTFLoader;
 
 type
@@ -32,7 +32,7 @@ type
 
   TRTFMemoParser = class(TRTFCustomParser)
   private
-    fFast: boolean;
+    fLoadingMode: TLoadingMode;
     procedure LoadFromChunks;
   protected
     procedure PushText; override;
@@ -40,7 +40,7 @@ type
     Memo  : TCustomRichMemo;
     constructor Create(AMemo: TCustomRichMemo; AStream: TStream);
     procedure StartReading; override;
-    property Fast: boolean read fFast write fFast;
+    property LoadingMode: TLoadingMode read fLoadingMode write fLoadingMode;
   end;
 
 { TRTFMemoParserr }
@@ -55,46 +55,15 @@ begin
     for i:=0 to Length(Chunks)-1 do begin
 
       len := UTF8Length(Chunks[i].Text);
-      Memo.SelStart := offset;
-      Memo.SelText := Chunks[i].Text;
-
+      Memo.InDelText(Chunks[i].Text, offset, 0);
+      Memo.SetParaMetric(offset, len, Chunks[i].prm.pm);
+      if Chunks[i].prm.tabs.Count>0 then
+        Memo.SetParaTabs(offset, len, Chunks[i].prm.tabs);
       Memo.SetTextAttributes(offset, len, Chunks[i].prm.fnt);
+      if Chunks[i].Link<>'' then
+        Memo.SetLink(offset, len, true, Chunks[i].Link);
 
       inc(offset, len);
-      {
-      memo.SetParaMetric(ofset, );
-
-      Memo.InDelText();
-      Memo.SelStart:=selst;
-      Memo.SelLength:=0;
-      Memo.SelText:=b;
-
-      if Assigned(prm) then begin
-        prm.pm.FirstLine:=prm.pm.HeadIndent+prm.pm.FirstLine;
-        Memo.SetParaMetric(selst, 1, prm.pm );
-        prm.pm.FirstLine:=prm.pm.FirstLine-prm.pm.HeadIndent;
-
-        Memo.SetParaAlignment(selst, 1, prm.pa );
-
-        if prm.tabs.Count>0 then
-          Memo.SetParaTabs(selst, 1, prm.tabs);
-      end;
-
-    //  Memo.GetTextAttributes(selst, font);
-      pf:=Fonts[prm.fnum];
-      if Assigned(pf) then prm.fnt.Name:=pf^.rtfFName;
-      //prm.fnt.Size:=round(fsz);
-      //prm.fnt.Style:=fst;
-      //prm.fnt.Color:=ColorToRGB(fColor);
-      //prm.fnt.HasBkClr:=hasbk;
-      //prm.fnt.BkColor:=bcolor;
-      Memo.SetTextAttributes(selst, len, prm.fnt);
-
-      if Field.valid then begin
-        if ResolveHyperlink(b) then
-          Memo.SetLink(selst, len, true, b);
-      end;
-      }
     end;
   finally
     Memo.Lines.EndUpdate;
@@ -109,7 +78,7 @@ var
   b     : string;
 begin
 
-  if fFast then begin
+  if fLoadingMode<>lmDefault then begin
     inherited PushText;
     exit;
   end;
@@ -171,26 +140,32 @@ end;
 
 procedure TRTFMemoParser.StartReading;
 begin
-  if fFast then begin
+  if fLoadingMode=lmFast then begin
     inherited StartReading;
     Consolidate;
     LoadFromChunks;
-    //Memo.BeginUpdate;
-    //Memo.LoadFromChunkArray(Chunks);
-    //Memo.EndUpdate;
+  end else
+  if fLoadingMode=lmWidgetset then begin
+    inherited StartReading;
+    Memo.Lines.BeginUpdate;
+    //DumpChunks;
+    //Consolidate;
+    Memo.LoadFromChunkArray(Chunks);
+    Memo.Lines.EndUpdate;
   end else begin
     Memo.Lines.BeginUpdate;
     try
       inherited StartReading;
-      Memo.SelStart:=0;
-      Memo.SelLength:=0;
     finally
       Memo.Lines.EndUpdate;
     end;
   end;
+  Memo.SelStart:=0;
+  Memo.SelLength:=0;
 end;
 
-function MVCParserLoadStream(ARich: TCustomRichMemo; Source: TStream): Boolean;
+function MVCParserLoadStream(ARich: TCustomRichMemo; Source: TStream;
+  mode: TLoadingMode): Boolean;
 var
   p   : TRTFMemoParser;
 begin
@@ -198,7 +173,7 @@ begin
   if not Result then Exit;
 
   p:=TRTFMemoParser.Create(ARich, Source);
-  p.Fast := true;
+  p.LoadingMode := mode;
   try
     p.StartReading;
   finally
@@ -213,7 +188,7 @@ begin
   LangConvInit;
 end;
 
-function SaveStream(ARich: TcustomRichMemo; Dst: TStream): Boolean;
+function SaveStream(ARich: TCustomRichMemo; Dst: TStream): Boolean;
 var
   p : TSaveParams;
 begin
@@ -328,7 +303,8 @@ begin
   idx:=i;
 end;
 
-procedure IntSaveStream(ARich: TCustomRichMemo; SaveParams: TSaveParams; Dst: TStream);
+procedure IntSaveStream(ARich: TcustomRichMemo; SaveParams: TSaveParams;
+  Dst: TStream);
 var
   ofs     : Integer;
   needlen : Integer;

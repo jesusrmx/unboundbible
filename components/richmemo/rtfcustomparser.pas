@@ -533,6 +533,7 @@ begin
   if Assigned(prm) then begin
     Chunks[i].prm.fnt := prm.fnt;
     Chunks[i].prm.pm := prm.pm;
+    Chunks[i].prm.pm.FirstLine += Chunks[i].prm.pm.HeadIndent;
     Chunks[i].prm.pa := prm.pa;
     Chunks[i].prm.tabs := prm.tabs;
   end;
@@ -553,7 +554,7 @@ var
   i, last: Integer;
 begin
 
-  DumpChunks;
+  //DumpChunks;
 
   last := 0;
   SetLength(track, length(chunks));
@@ -584,7 +585,7 @@ begin
     dec(i);
   end;
   //WriteLn('Chunks After consolidate: ', Length(Chunks));
-  DumpChunks;
+  //DumpChunks;
 end;
 
 procedure TRTFCustomParser.DumpChunks;

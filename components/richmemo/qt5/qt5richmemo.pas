@@ -44,6 +44,7 @@ type
       var Params: TIntFontParams): Boolean; override;
     class procedure SetTextAttributes(const AWinControl: TWinControl; TextStart, TextLen: Integer;
       const Params: TIntFontParams); override;
+    class procedure LoadFromChunkArray(const AWinControl: TWinControl; chunks: TRTFChunkArray); override;
 
     class function GetParaRange(const AWinControl: TWinControl; TextStart: Integer; var rng: TParaRange): Boolean; override;
     class procedure InDelText(const AWinControl: TWinControl; const TextUTF8: String; DstStart, DstLen: Integer); override;
@@ -405,6 +406,69 @@ begin
   QTextCursor_Destroy(tc);
 
   te.setSelection(ss, sl);
+end;
+
+class procedure TQtWSCustomRichMemo.LoadFromChunkArray(
+  const AWinControl: TWinControl; chunks: TRTFChunkArray);
+var
+  obj: TQtTextEdit;
+  te: QTextEditH;
+  doc: QTextDocumentH;
+  cursor: QTextCursorH;
+  fmt: QTextCharFormatH;
+  i: Integer;
+  ws: UnicodeString;
+  clr: TQColor;
+  Brush: QBrushH;
+const
+  QIsBold: array [Boolean] of integer = (QNormal, QBold);
+begin
+  if not WSCheckHandleAllocated(AWinControl, 'LoadFromChunkArray') then
+    Exit;
+
+  obj := TQtTextEdit(AWinControl.Handle);
+  te := QTextEditH(obj.Widget);
+
+  doc := QTextDocument_Create();
+  //doc := QTextEdit_document(te);
+  cursor := QTextCursor_create(doc);
+  fmt := QTextCharFormat_Create();
+
+  for i:=0 to Length(chunks)-1 do
+  with chunks[i] do begin
+
+    with prm.fnt do begin
+      ws:=UTF8Decode(Name);
+      if ws<>'' then QTextCharFormat_setFontFamily(fmt, @ws);
+      if Size>0 then QTextCharFormat_setFontPointSize(fmt, Size);
+      QTextCharFormat_setFontUnderline(fmt, fsUnderline in Style);
+      QTextCharFormat_setFontWeight(fmt, QisBold[fsBold in Style]);
+      QTextCharFormat_setFontItalic(fmt, fsItalic in Style);
+
+      ColorRefToTQColor(ColorToRGB(Color), clr);
+      Brush := QBrush_create(@clr, QtSolidPattern);
+      QTextFormat_setForeground(QTextFormatH(fmt), brush);
+      QBrush_Destroy(Brush);
+
+      if HasBkClr then begin
+        ColorRefToTQColor(ColorToRGB(BkColor), clr);
+        Brush := QBrush_create(@clr, QtSolidPattern);
+        QTextFormat_setBackground(QTextFormatH(fmt), brush);
+        QBrush_Destroy(Brush);
+      end;
+    end;
+
+    QTextCharFormat_setAnchor(fmt, Link<>'');
+    ws := UTF8Decode(Link);
+    QTextCharFormat_setAnchorHref(fmt, @ws);
+
+    ws := UTF8Decode(Chunks[i].Text);
+    QTextCursor_insertText(cursor, @ws, fmt);
+  end;
+
+  QTextEdit_setDocument(te, doc);
+  QTextEdit_setTabStopWidth(te, 55);
+
 end;
 
 class function TQtWSCustomRichMemo.GetParaRange(const AWinControl: TWinControl;
