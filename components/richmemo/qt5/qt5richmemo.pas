@@ -98,13 +98,23 @@ const
   );
 
 
-function QBrushToColor(brush: QBrushH): TQColor;
+function QBrushToColor(brush: QBrushH): TQColor; overload;
 var
   aColor: PQColor;
 begin
   aColor := QBrush_color(brush);
   if aColor<>nil then result := aColor^
   else                fillChar(result, sizeOf(TQColor), 0);
+end;
+
+function QBrushToColor(brush: QBrushH; out color: TQColor): boolean; overload;
+var
+  aColor: PQColor;
+begin
+  aColor := QBrush_color(brush);
+  result := aColor<>nil;
+  if result then
+    color := aColor^;
 end;
 
 function SameColor(A, B: TQColor): boolean;
@@ -120,6 +130,8 @@ var
   refIsAnchor: Boolean;
   refHRef, refFont: WideString;
   font: QFontH;
+  refBackBrushStyle: QtBrushStyle;
+  refHasBackColor: boolean;
   refForeColor, refBackColor: TQColor;
   brush: QBrushH;
   doc: QTextDocumentH;
@@ -127,7 +139,8 @@ var
   function SameFormats: boolean;
   var
     tmpStr: wideString;
-    aColor: TQColor;
+    hasBackColor: boolean;
+    backColor: TQColor;
   begin
     // deal with hyperlinks
     result := QTextCharFormat_isAnchor(fmtCur)=refIsAnchor;
@@ -137,10 +150,24 @@ var
       result := tmpStr=refHRef;
       exit;
     end;
-    // colors
+
+    // text color
     QTextFormat_foreground(QTextFormatH(fmtCur), brush);
     result := SameColor(QBrushToColor(brush), refForeColor);
     if not result then exit;
+
+    // background color
+    QTextFormat_background(QTextFormatH(fmtCur), brush);
+    result := QBrush_style(brush)=refBackBrushStyle;
+    if not result then exit;
+    hasBackColor := QBrushToColor(brush, backColor);
+    result := refHasBackColor=hasBackColor;
+    if not result then exit;
+    if hasBackColor then begin
+      result := SameColor(backColor, refBackColor);
+      if not result then exit;
+    end;
+
     // deal with formats
     QTextCharFormat_font(fmtCur, font);
     QFont_toString(font, @tmpStr);
@@ -174,6 +201,9 @@ begin
 
     QTextFormat_foreground(QTextFormatH(fmtRef), brush);
     refForeColor := QBrushToColor(brush);
+    QTextFormat_background(QTextFormatH(fmtRef), brush);
+    refBackBrushStyle := QBrush_style(brush);
+    refHasBackColor := QBrushToColor(brush, refBackColor);
   end;
 
   // find left limit
@@ -340,6 +370,9 @@ var
   clr: TQColor;
   bck : TEditorState;
   tc: QTextCursorH;
+  fmt: QTextCharFormatH;
+  brush: QBrushH;
+  brushStyle: QtBrushStyle;
 begin
   InitFontParams(Params);
   if not WSCheckHandleAllocated(AWinControl, 'GetTextAttributes') then begin
@@ -356,17 +389,14 @@ begin
   // it would move the cursor at the begining of the next block which would make
   // that the retrieved attibutes do not match the previous block attributes
   // (the expected behaviour) but the attributes of the next block which is wrong
-  //te.setSelection(TextStart, 1);
-  te.setSelection(TextStart, 0);
 
   tc := QTextCursor_Create();
   QTextEdit_textCursor(w, tc);
+
+  QTextCursor_setPosition(tc, TextStart);
   if not QTextCursor_atBlockEnd(tc) then
-    te.setSelection(TextStart, 1);
-  QTextCursor_Destroy(tc);
+    QTextCursor_setPosition(tc, TextStart + 1, QTextCursorKeepAnchor);
 
-
-  //todo!
   ws:='';
   QTextEdit_fontFamily(w, @ws);
   if ws<>'' then Params.Name:=UTF8Encode(ws);
@@ -376,17 +406,23 @@ begin
   if QTextEdit_fontItalic(w) then Include(Params.Style, fsItalic);
   if QTextEdit_fontUnderline(w) then Include(Params.Style, fsUnderline);
 
-  FillChar(clr, sizeof(clr), 0);
-  QTextEdit_textColor(w, @clr);
+  brush := QBrush_Create();
+  fmt := QTextCharFormat_Create();
+  QTextCursor_charFormat(tc, fmt);
+
+  QTextFormat_foreground(QTextFormatH(fmt), brush);
+  QBrushToColor(brush, clr);
   TQColorToColorRef(clr, TColorRef(params.Color));
 
-  FillChar(clr, sizeof(clr), 0);
-  QTextEdit_textBackgroundColor(w, @clr);
-  TQColorToColorRef(clr, TColorRef(params.BkColor));
-  //todo!
-  params.HasBkClr:=false;
+  QTextFormat_background(QTextFormatH(fmt), brush);
+  brushStyle := QBrush_style(brush);
+  params.HasBkClr := (brushStyle=QtSolidPattern) and QBrushToColor(brush, clr);
+  if params.HasBkClr then
+    TQColorToColorRef(clr, TColorRef(params.BkColor));
 
-  ApplyBackup(te, bck);
+  QBrush_Destroy(brush);
+  QTextCharFormat_Destroy(fmt);
+  QTextCursor_Destroy(tc);
 
   Result:=true;
 end;
@@ -435,14 +471,14 @@ begin
   ColorRefToTQColor(ColorToRGB(Params.Color), clr);
   Brush := QBrush_create(@clr, QtSolidPattern);
   QTextFormat_setForeground(QTextFormatH(fmt), brush);
-  QBrush_Destroy(Brush);
 
   if Params.HasBkClr then begin
     ColorRefToTQColor(ColorToRGB(Params.BkColor), clr);
-    Brush := QBrush_create(@clr, QtSolidPattern);
-    QTextFormat_setBackground(QTextFormatH(fmt), brush);
-    QBrush_Destroy(Brush);
-  end;
+    QBrush_setColor(brush, @clr);
+  end else
+    QBrush_setStyle(brush, QtNoBrush);
+  QTextFormat_setBackground(QTextFormatH(fmt), brush);
+  QBrush_Destroy(Brush);
 
   QTextCharFormat_setAnchor(fmt, false);
   ws := '';
