@@ -147,11 +147,11 @@ begin
   end else
   if fLoadingMode=lmWidgetset then begin
     inherited StartReading;
-    Memo.Lines.BeginUpdate;
+    Memo.BeginUpdate;
     //DumpChunks;
     //Consolidate;
     Memo.LoadFromChunkArray(Chunks);
-    Memo.Lines.EndUpdate;
+    Memo.EndUpdate;
   end else begin
     Memo.Lines.BeginUpdate;
     try

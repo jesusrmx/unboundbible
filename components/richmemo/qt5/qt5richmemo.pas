@@ -26,8 +26,14 @@ type
   TQtRichTextEdit = class(TQtTextEdit)
   private
     anchor: Widestring;
+    FSelectionChangedHook: QTextEdit_hookH;
+    FCursorPositionChangedHook: QTextEdit_hookH;
   public
+    procedure AttachEvents; override;
+    procedure DetachEvents; override;
     function SlotMouse(Sender: QObjectH; Event: QEventH): Boolean; override; cdecl;
+    procedure SignalSelectionChanged(); cdecl;
+    procedure SignalCursorPositionChanged(); cdecl;
   end;
 
   { TQtWSCustomRichMemo }
@@ -60,6 +66,8 @@ type
 
     class function GetStyleRange(const AWinControl: TWinControl; TextStart: Integer; var RangeStart, RangeLen: Integer): Boolean; override;
 
+    class procedure BeginUpdate(const AWinControl: TWinControl); override;
+    class procedure EndUpdate(const AWinControl: TWinControl); override;
   end;
 
 type
@@ -197,6 +205,35 @@ end;
 
 { TQtRichTextEdit }
 
+procedure TQtRichTextEdit.AttachEvents;
+begin
+  inherited AttachEvents;
+
+  FSelectionChangedHook := QTextEdit_hook_create(Widget);
+  QTextEdit_hook_hook_selectionChanged(FSelectionChangedHook, SignalSelectionChanged);
+
+  FCursorPositionChangedHook := QTextEdit_hook_create(Widget);
+  QTextEdit_hook_hook_cursorPositionChanged(FCursorPositionChangedHook, SignalCursorPositionChanged);
+end;
+
+procedure TQtRichTextEdit.DetachEvents;
+begin
+
+  if FSelectionChangedHook <> nil then
+  begin
+    QObject_hook_Destroy(FSelectionChangedHook);
+    FSelectionChangedHook := nil;
+  end;
+
+  if FCursorPositionChangedHook <> nil then
+  begin
+    QObject_hook_Destroy(FCursorPositionChangedHook);
+    FCursorPositionChangedHook := nil;
+  end;
+
+  inherited DetachEvents;
+end;
+
 function TQtRichTextEdit.SlotMouse(Sender: QObjectH; Event: QEventH): Boolean;
   cdecl;
 var
@@ -228,6 +265,18 @@ begin
     end;
   end;
   Result:=inherited SlotMouse(Sender, Event);
+end;
+
+procedure TQtRichTextEdit.SignalSelectionChanged(); cdecl;
+begin
+  if (LCLObject is TCustomRichMemo) then
+    TCustomRichMemoInt(LCLObject).DoSelectionChange();
+end;
+
+procedure TQtRichTextEdit.SignalCursorPositionChanged(); cdecl;
+begin
+  if (LCLObject is TCustomRichMemo) then
+    TCustomRichMemoInt(LCLObject).DoSelectionChange();
 end;
 
 { TQtWSCustomRichMemo }
@@ -706,6 +755,26 @@ begin
     ApplyBackup(te, bck);
   end;
   {$endif}
+end;
+
+class procedure TQtWSCustomRichMemo.BeginUpdate(const AWinControl: TWinControl);
+var
+  te: TQtTextEdit;
+begin
+  if not WSCheckHandleAllocated(AWinControl, 'BeginUpdate') then
+    exit;
+  te:=TQtTextEdit(AWinControl.Handle);
+  te.DetachEvents;
+end;
+
+class procedure TQtWSCustomRichMemo.EndUpdate(const AWinControl: TWinControl);
+var
+  te: TQtTextEdit;
+begin
+  if not WSCheckHandleAllocated(AWinControl, 'EndUpdate') then
+    exit;
+  te:=TQtTextEdit(AWinControl.Handle);
+  te.AttachEvents;
 end;
 
 class function TQtWSCustomRichMemo.GetParaAlignment(
