@@ -205,6 +205,36 @@ begin
     g_slist_free(tags);
 end;
 
+procedure gtk_text_buffer_split_tags_at_offset(widget: PGtkWidget; buffer: PGtkTextBuffer;
+  offset, splitLen: Integer);
+var
+  iStart, iEnd: TGtkTextIter;
+  item: PGSList;
+  tag: PGtkTextTag;
+  attr: PGtkTextAttributes;
+  hasbg: Boolean;
+begin
+
+  attr := gtk_text_view_get_default_attributes(PGtkTextView(widget));
+  if not Assigned(attr) then Exit;
+  gtk_text_buffer_get_iter_at_offset (buffer, @iStart, offset);
+  gtk_text_iter_get_attributes(@iStart, attr);
+  hasbg := draw_bg(attr^.appearance)=1;
+  gtk_text_attributes_unref(attr);
+
+  if not hasbg then
+    exit;
+
+  gtk_text_buffer_get_iter_at_offset (buffer, @iEnd, offset+splitLen);
+
+  item := gtk_text_iter_get_tags(@iStart);
+  while (item<>nil) do begin
+    tag := PGtkTextTag(item^.data);
+    gtk_text_buffer_remove_tag(buffer, tag, @iStart, @iEnd);
+    item := item^.next;
+  end;
+end;
+
 procedure gtk_texttag_free_linkref(linkref: gpointer); cdecl;
 begin
   StrDispose(pchar(linkref));
@@ -1036,6 +1066,7 @@ var
   gcolor  : TGdkColor;
   bgcolor : TGdkColor;
   nm      : string;
+  attr: PGtkTextAttributes;
 const
   pu: array [Boolean] of gint = (PANGO_UNDERLINE_NONE, PANGO_UNDERLINE_SINGLE);
   pb: array [Boolean] of gint = (PANGO_WEIGHT_NORMAL, PANGO_WEIGHT_BOLD);
@@ -1045,7 +1076,15 @@ begin
   if not Assigned(buffer) then Exit;
 
   gcolor := TColortoTGDKColor(Params.Color);
+
+  //WriteLn('bkcolor=', ColorToString(Params.BkColor),' hasBkColor=', Params.HasBkClr);
   bgcolor := TColortoTGDKColor(Params.BkColor);
+  if not Params.HasBkClr then begin
+    // applying a no background style over a tag with background
+    // will expose the underlying background
+    gtk_text_buffer_split_tags_at_offset(TextWidget, buffer, TextStart, TextLen);
+  end;
+
   nm := Params.Name;
   if nm = '' then nm := #0;
   tag := gtk_text_buffer_create_tag (buffer, nil,
@@ -1066,6 +1105,7 @@ begin
       'strikethrough-set', gboolean(gTRUE),
       'strikethrough',    gboolean(fsStrikeOut in Params.Style),
       nil]);
+
   ApplyTag(buffer, tag, TextStart, TextLen);
 
   FormatSubSuperScript(buffer, Params.VScriptPos, Params.Size, TextStart, TextLen);
