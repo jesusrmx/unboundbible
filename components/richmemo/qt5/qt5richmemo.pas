@@ -13,7 +13,7 @@ interface
 //  QTextCharFormatH
 //  QTextBlockFormatH
 uses
-  LCLType, Controls, StdCtrls, Graphics,
+  SysUtils, LCLType, Controls, StdCtrls, Graphics,
   qt5, qtobjects, qtwidgets, qtprivate,
   WSProc,
   RichMemo, WSRichMemo;
@@ -51,6 +51,16 @@ type
     class procedure SetTextAttributes(const AWinControl: TWinControl; TextStart, TextLen: Integer;
       const Params: TIntFontParams); override;
     class procedure LoadFromChunkArray(const AWinControl: TWinControl; chunks: TRTFChunkArray); override;
+
+    class function GetParaMetric(const AWinControl: TWinControl; TextStart: Integer;
+      var AMetric: TIntParaMetric): Boolean; override;
+    class procedure SetParaMetric(const AWinControl: TWinControl; TextStart, TextLen: Integer;
+      const AMetric: TIntParaMetric); override;
+    //
+    //class function GetParaNumbering(const AWinControl: TWinControl; TextStart: Integer;
+    //  var ANumber: TIntParaNumbering): Boolean; override;
+    //class procedure SetParaNumbering(const AWinControl: TWinControl; TextStart, TextLen: Integer;
+    //  const ANumber: TIntParaNumbering); override;
 
     class function GetParaRange(const AWinControl: TWinControl; TextStart: Integer; var rng: TParaRange): Boolean; override;
     class procedure InDelText(const AWinControl: TWinControl; const TextUTF8: String; DstStart, DstLen: Integer); override;
@@ -553,8 +563,102 @@ begin
 
   QTextEdit_setDocument(te, doc);
   QTextEdit_setTabStopWidth(te, 55);
-
+  QTextEdit_setTabChangesFocus(te, not TCustomMemo(AWinControl).WantTabs);
 end;
+
+class function TQtWSCustomRichMemo.GetParaMetric(
+  const AWinControl: TWinControl; TextStart: Integer;
+  var AMetric: TIntParaMetric): Boolean;
+var
+  te: TQtTextEdit;
+  w: QTextEditH;
+  fmt: QTextBlockFormatH;
+  tc: QTextCursorH;
+begin
+  result := WSCheckHandleAllocated(AWinControl, 'GetParaMetric');
+  if not result then
+    exit;
+
+  te:=TQtTextEdit(AWinControl.Handle);
+  w:=QTextEditH(te.Widget);
+
+  tc := QTextCursor_Create();
+  fmt := QTextBlockFormat_Create();
+
+  QTextEdit_textCursor(w, tc);
+
+  QTextCursor_setPosition(tc, TextStart);
+  QTextCursor_blockFormat(tc, fmt);
+
+  AMetric.FirstLine   := QTextBlockFormat_textIndent(fmt);
+  AMetric.HeadIndent  := QTextBlockFormat_leftMargin(fmt);
+  AMetric.TailIndent  := QTextBlockFormat_rightMargin(fmt);
+  AMetric.SpaceBefore := QTextBlockFormat_topMargin(fmt);
+  AMetric.SpaceAfter  := QTextBlockFormat_bottomMargin(fmt);
+  AMetric.LineSpacing := QTextBlockFormat_lineHeight(fmt);
+
+  QTextBlockFormat_Destroy(fmt);
+  QTextCursor_Destroy(tc);
+end;
+
+class procedure TQtWSCustomRichMemo.SetParaMetric(
+  const AWinControl: TWinControl; TextStart, TextLen: Integer;
+  const AMetric: TIntParaMetric);
+var
+  te: TQtTextEdit;
+  w: QTextEditH;
+  fmt: QTextBlockFormatH;
+  tc: QTextCursorH;
+  lh: QReal;
+begin
+
+  if not WSCheckHandleAllocated(AWinControl, 'SetParaMetric') then
+    exit;
+
+  te:=TQtTextEdit(AWinControl.Handle);
+  w:=QTextEditH(te.Widget);
+
+  tc := QTextCursor_Create();
+  fmt := QTextBlockFormat_Create();
+
+  QTextEdit_textCursor(w, tc);
+  QTextCursor_setPosition(tc, TextStart);
+  QTextCursor_blockFormat(tc, fmt);
+
+  with AMetric do begin
+    QTextBlockFormat_setTextIndent(fmt, FirstLine);
+    QTextBlockFormat_setLeftMargin(fmt, HeadIndent);
+    QTextBlockFormat_setRightMargin(fmt, TailIndent);
+    QTextBlockFormat_setTopMargin(fmt, SpaceBefore);
+    QTextBlockFormat_setBottomMargin(fmt, SpaceAfter);
+    QTextBlockFormat_setLineHeight(fmt, LineSpacing, ord(QTextBlockFormatSingleHeight));
+  end;
+
+  QTextCursor_setBlockFormat(tc, fmt);
+
+  QTextBlockFormat_Destroy(fmt);
+  QTextCursor_Destroy(tc);
+end;
+//
+//class function TQtWSCustomRichMemo.GetParaNumbering(
+//  const AWinControl: TWinControl; TextStart: Integer;
+//  var ANumber: TIntParaNumbering): Boolean;
+//begin
+//  result := false;
+//  if not WSCheckHandleAllocated(AWinControl, 'GetParaNumbering') then
+//    Exit;
+//
+//  InitParaNumbering(ANumber);
+//
+//  result := true;
+//end;
+//
+//class procedure TQtWSCustomRichMemo.SetParaNumbering(
+//  const AWinControl: TWinControl; TextStart, TextLen: Integer;
+//  const ANumber: TIntParaNumbering);
+//begin
+//  inherited SetParaNumbering(AWinControl, TextStart, TextLen, ANumber);
+//end;
 
 class function TQtWSCustomRichMemo.GetParaRange(const AWinControl: TWinControl;
   TextStart: Integer; var rng: TParaRange): Boolean;
