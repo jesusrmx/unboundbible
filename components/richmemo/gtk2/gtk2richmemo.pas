@@ -82,6 +82,8 @@ type
     class procedure SetParaMetric(const AWinControl: TWinControl; TextStart, TextLen: Integer;
       const AMetric: TIntParaMetric); override;
 
+    class function GetParaNumbering(const AWinControl: TWinControl; TextStart: Integer;
+      var ANumber: TIntParaNumbering): Boolean; override;
     class procedure SetParaNumbering(const AWinControl: TWinControl; TextStart,
       TextLen: Integer; const ANumber: TIntParaNumbering); override;
 
@@ -1239,6 +1241,14 @@ begin
       'pixels-inside_wrap-set', gboolean(gTRUE),
       nil]);
   ApplyTag(buffer, tag, TextStart, TextLen, true);
+end;
+
+class function TGtk2WSCustomRichMemo.GetParaNumbering(
+  const AWinControl: TWinControl; TextStart: Integer;
+  var ANumber: TIntParaNumbering): Boolean;
+begin
+  Result := true;
+  InitParaNumbering(ANumber);
 end;
 
 class procedure TGtk2WSCustomRichMemo.SetParaNumbering(
