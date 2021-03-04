@@ -56,11 +56,11 @@ type
       var AMetric: TIntParaMetric): Boolean; override;
     class procedure SetParaMetric(const AWinControl: TWinControl; TextStart, TextLen: Integer;
       const AMetric: TIntParaMetric); override;
-    //
-    //class function GetParaNumbering(const AWinControl: TWinControl; TextStart: Integer;
-    //  var ANumber: TIntParaNumbering): Boolean; override;
-    //class procedure SetParaNumbering(const AWinControl: TWinControl; TextStart, TextLen: Integer;
-    //  const ANumber: TIntParaNumbering); override;
+
+    class function GetParaNumbering(const AWinControl: TWinControl; TextStart: Integer;
+      var ANumber: TIntParaNumbering): Boolean; override;
+    class procedure SetParaNumbering(const AWinControl: TWinControl; TextStart, TextLen: Integer;
+      const ANumber: TIntParaNumbering); override;
 
     class function GetParaRange(const AWinControl: TWinControl; TextStart: Integer; var rng: TParaRange): Boolean; override;
     class procedure InDelText(const AWinControl: TWinControl; const TextUTF8: String; DstStart, DstLen: Integer); override;
@@ -639,26 +639,26 @@ begin
   QTextBlockFormat_Destroy(fmt);
   QTextCursor_Destroy(tc);
 end;
-//
-//class function TQtWSCustomRichMemo.GetParaNumbering(
-//  const AWinControl: TWinControl; TextStart: Integer;
-//  var ANumber: TIntParaNumbering): Boolean;
-//begin
-//  result := false;
-//  if not WSCheckHandleAllocated(AWinControl, 'GetParaNumbering') then
-//    Exit;
-//
-//  InitParaNumbering(ANumber);
-//
-//  result := true;
-//end;
-//
-//class procedure TQtWSCustomRichMemo.SetParaNumbering(
-//  const AWinControl: TWinControl; TextStart, TextLen: Integer;
-//  const ANumber: TIntParaNumbering);
-//begin
-//  inherited SetParaNumbering(AWinControl, TextStart, TextLen, ANumber);
-//end;
+
+class function TQtWSCustomRichMemo.GetParaNumbering(
+  const AWinControl: TWinControl; TextStart: Integer;
+  var ANumber: TIntParaNumbering): Boolean;
+begin
+  result := false;
+  if not WSCheckHandleAllocated(AWinControl, 'GetParaNumbering') then
+    Exit;
+
+  InitParaNumbering(ANumber);
+
+  result := true;
+end;
+
+class procedure TQtWSCustomRichMemo.SetParaNumbering(
+  const AWinControl: TWinControl; TextStart, TextLen: Integer;
+  const ANumber: TIntParaNumbering);
+begin
+
+end;
 
 class function TQtWSCustomRichMemo.GetParaRange(const AWinControl: TWinControl;
   TextStart: Integer; var rng: TParaRange): Boolean;
