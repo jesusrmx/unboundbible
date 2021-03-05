@@ -148,6 +148,7 @@ type
     function GetTextStr: string; override;
     function GetCount: integer; override;
     function Get(Index : Integer) : string; override;
+    procedure SetUpdateState(Updating: Boolean); override;
   public
     constructor Create(TextView : PGtkTextView; TheOwner: TWinControl);
     destructor Destroy; override;
@@ -638,6 +639,19 @@ begin
   end
   else
     Result := '';
+end;
+
+procedure TGtk2RichMemoStrings.SetUpdateState(Updating: Boolean);
+var
+  id: guint;
+  hid: gulong;
+begin
+  inherited SetUpdateState(Updating);
+
+  id := g_signal_lookup('changed', GTK_TYPE_TEXT_BUFFER);
+  hid := g_signal_handler_find(FGtkBuf, G_SIGNAL_MATCH_ID, id, 0, nil, nil, nil);
+  if Updating then g_signal_handler_block(FGtkBuf, hid)
+  else             g_signal_handler_unblock(FGtkBuf, hid);
 end;
 
 constructor TGtk2RichMemoStrings.Create(TextView: PGtkTextView;
