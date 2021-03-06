@@ -1260,9 +1260,25 @@ end;
 class function TGtk2WSCustomRichMemo.GetParaNumbering(
   const AWinControl: TWinControl; TextStart: Integer;
   var ANumber: TIntParaNumbering): Boolean;
+var
+  w: PGtkWidget;
+  b: PGtkTextBuffer;
 begin
-  Result := true;
+
+  GetWidgetBuffer(AWinControl, w, b);
+  if not Assigned(w) or not Assigned(b) then Exit;
+
   InitParaNumbering(ANumber);
+
+  tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(b), TagNameNumeric);
+
+  gtk_text_buffer_get_iter_at_offset (b, @istart, TextStart);
+  gtk_text_iter_set_line_offset(@istart, 0);
+
+  result := gtk_text_iter_begins_tag(@istart, tag);
+  if result then begin
+
+  end;
 end;
 
 class procedure TGtk2WSCustomRichMemo.SetParaNumbering(
@@ -1285,10 +1301,11 @@ begin
   GetWidgetBuffer(AWinControl, w, b);
   if not Assigned(w) or not Assigned(b) then Exit;
 
-  tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(b)
-    , TagNameNumeric);
+  tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(b), TagNameNumeric);
 
   gtk_text_buffer_get_iter_at_offset (b, @istart, TextStart);
+
+
   iend:=istart;
   gtk_text_iter_forward_chars(@iend, TextLen);
   ln:=gtk_text_iter_get_line(@istart);
