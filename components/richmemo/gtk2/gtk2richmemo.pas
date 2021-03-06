@@ -1263,20 +1263,24 @@ class function TGtk2WSCustomRichMemo.GetParaNumbering(
 var
   w: PGtkWidget;
   b: PGtkTextBuffer;
+  tag: PGtkTextTag;
+  istart: TGtkTextIter;
 begin
 
   GetWidgetBuffer(AWinControl, w, b);
   if not Assigned(w) or not Assigned(b) then Exit;
 
   InitParaNumbering(ANumber);
+  result := true;
 
   tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(b), TagNameNumeric);
 
   gtk_text_buffer_get_iter_at_offset (b, @istart, TextStart);
   gtk_text_iter_set_line_offset(@istart, 0);
 
-  result := gtk_text_iter_begins_tag(@istart, tag);
-  if result then begin
+  if gtk_text_iter_begins_tag(@istart, tag) then begin
+
+    ANumber.Style := pnBullet;
 
   end;
 end;
