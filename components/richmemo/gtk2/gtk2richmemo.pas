@@ -21,6 +21,8 @@ unit Gtk2RichMemo;
 
 {$mode objfpc}{$H+}
 
+{.$define DEBUG}
+
 interface
 
 uses
@@ -29,7 +31,7 @@ uses
   // RTL/FCL
   Types, Classes, SysUtils,
   // LCL
-  LCLType, Controls, Graphics, LazUTF8, StdCtrls, LCLProc,
+  LCLType, Controls, Graphics, LazUTF8, StdCtrls, LCLProc, {$IFDEF Debug} LazLogger,{$ENDIF}
   // Gtk2 widget
   Gtk2Int, Gtk2Def,
   GTK2WinApiWindow, Gtk2Globals, Gtk2Proc,
@@ -198,75 +200,13 @@ begin
   result := baseName+':'+IntToStr(counter);
 end;
 
+{$IFDEF DEBUG}
 procedure DumpTag(tag: PGtkTextTag; data:gpointer); cdecl;
 var
   indent, left_margin: gint;
   left_margin_set: gboolean;
   name: pgchar;
 begin
-  {
-  PGtkTextTag = ^TGtkTextTag;
-  PPGtkTextTag = ^PGtkTextTag;
-  TGtkTextTag = record
-       parent_instance : TGObject;
-       table : PGtkTextTagTable;
-       name : Pchar;
-       priority : longint;
-       values : PGtkTextAttributes;
-       flag0 : longint;
-    end;
-  }
-  {
-  TGtkTextAttributes = record
-       refcount : guint;
-       appearance : TGtkTextAppearance;
-       justification : TGtkJustification;
-       direction : TGtkTextDirection;
-       font : PPangoFontDescription;
-       font_scale : gdouble;
-       left_margin : gint;
-       indent : gint;
-       right_margin : gint;
-       pixels_above_lines : gint;
-       pixels_below_lines : gint;
-       pixels_inside_wrap : gint;
-       tabs : PPangoTabArray;
-       wrap_mode : TGtkWrapMode;
-       language : PPangoLanguage;
-       padding1 : gpointer;
-       flag0 : word;
-    end;
-  }
-  {
-  TGtkTextAppearance = record
-       bg_color : TGdkColor;
-       fg_color : TGdkColor;
-       bg_stipple : PGdkBitmap;
-       fg_stipple : PGdkBitmap;
-       rise : gint;
-       padding1 : gpointer;
-       flag0 : word;
-    end;
-  }
-
-  {
-  GTK_JUSTIFY_LEFT = 0;
-  GTK_JUSTIFY_RIGHT = 1;
-  GTK_JUSTIFY_CENTER = 2;
-  GTK_JUSTIFY_FILL = 3;
-  }
-
-  {
-  GTK_TEXT_DIR_NONE = 0;
-  GTK_TEXT_DIR_LTR = 1;
-  GTK_TEXT_DIR_RTL = 2;
-  }
-
-  {
-  GTK_WRAP_NONE = 0;
-  GTK_WRAP_CHAR = 1;
-  GTK_WRAP_WORD = 2;
-  }
   g_object_get(G_OBJECT(tag),
     pchar('indent'), [ @indent,
     'left-margin', @left_margin,
@@ -274,13 +214,11 @@ begin
     'name', @name,
     nil
     ]);
-  Write(' Pri:', tag^.priority);
-  Write(' Indent=', indent);
-  Write(' left_margin: ');
-  if left_margin_set then Write('SET ', left_margin, ' px')
-  else                    Write('UNSET ', left_margin);
-  Write(' name=', name);
-  WriteLn;
+  dbgOut('  pri=%d indent=%d left_margin=',[tag^.priority, indent]);
+  if left_margin_set then dbgOut('SET %d px', [left_margin])
+  else                    dbgOut('UNSET ', [left_margin]);
+  dbgOut(' name=%s', [name]);
+  DebugLn;
 end;
 
 procedure DumpTagsAt(msg: string; buffer: PGtkTextBuffer; offset:Integer; len:Integer=5);
@@ -303,7 +241,7 @@ begin
     if p^ in [#0..#32,#128..#255] then  txt := '#' + IntToStr(ord(p^))
     else                                txt := p^;
   end;
-  WriteLn(msg, ' tags at offset=', offset, '[', txt, ']:');
+  DebugLn('%s: tags at offset=%d [%s]', [msg, offset, txt]);
   tags := gtk_text_iter_get_tags(@iter);
 
   tagItem := tags;
@@ -336,7 +274,7 @@ var
   tag: Pointer;
 begin
   table := gtk_text_buffer_get_tag_table(buffer);
-  WriteLn(msg,' Count=', gtk_text_tag_table_get_size(table) ,':');
+  DebugLn('%s Count=%d:', [msg,' Count=', gtk_text_tag_table_get_size(table) ,':');
 
   List := TList.Create;
   gtk_text_tag_table_foreach(table, @CollectTags, List);
@@ -345,6 +283,7 @@ begin
     DumpTag(PGtkTextTag(tag), nil);
   List.Free;
 end;
+{$ENDIF}
 
 procedure gtk_text_buffer_copy_tags_from_offset(buffer: PGtkTextBuffer;
   srcIter: PGtkTextIter; dstOffset, dstLen: Integer);
@@ -568,7 +507,9 @@ begin
             'scale-set', gboolean(gTRUE),
             nil]);
         gtk_text_buffer_apply_tag(b, tag, iter, StartIter);
-        WriteLn('Applied ScaleTag');
+        {$IFDEF DEBUG}
+        DebugLn('Applied ScaleTag');
+        {$ENDIF}
       end;
       gtk_text_attributes_unref(attr);
     end;
@@ -838,13 +779,15 @@ begin
 
   id := g_signal_lookup('changed', GTK_TYPE_TEXT_BUFFER);
   hid := g_signal_handler_find(FGtkBuf, G_SIGNAL_MATCH_ID, id, 0, nil, nil, nil);
-  if Updating then g_signal_handler_block(FGtkBuf, hid)
-  else
-    begin
-      g_signal_handler_unblock(FGtkBuf, hid);
-      WriteLn;
-      DumpTagTable(FGtkBuf, 'Dump Tag Table');
-    end;
+  if Updating then
+    g_signal_handler_block(FGtkBuf, hid)
+  else begin
+    g_signal_handler_unblock(FGtkBuf, hid);
+    {$IFDEF DEBUG}
+    DebugLn;
+    DumpTagTable(FGtkBuf, 'Dump Tag Table');
+    {$ENDIF}
+  end;
 end;
 
 constructor TGtk2RichMemoStrings.Create(TextView: PGtkTextView;
@@ -1257,7 +1200,9 @@ begin
         'rise-set',  gboolean(gTRUE),
         nil]);
     gtk_text_buffer_apply_tag(buffer, tag, @istart, @iend);
-    WriteLn('Applied vpNormal Tag');
+    {$IFDEF DEBUG}
+    DebugLn('Applied vpNormal Tag');
+    {$ENDIF}
   end else begin
     gtk_text_buffer_get_iter_at_offset (buffer, @iend, TextStart+TextLen);
 
@@ -1279,7 +1224,9 @@ begin
         nil]);
     gtk_text_buffer_apply_tag(buffer, tag, @istart, @iend);
     gtk_text_buffer_apply_tag(buffer, scrtag, @istart, @iend);
-    WriteLn('Applied Sub or Super Script Tags');
+    {$IFDEF DEBUG}
+    DebugLn('Applied Sub or Super Script Tags');
+    {$ENDIF}
   end;
 end;
 
@@ -1332,7 +1279,6 @@ begin
 
   gcolor := TColortoTGDKColor(Params.Color);
 
-  //WriteLn('bkcolor=', ColorToString(Params.BkColor),' hasBkColor=', Params.HasBkClr);
   bgcolor := TColortoTGDKColor(Params.BkColor);
   if not Params.HasBkClr then begin
     // applying a no background style over a tag with background
@@ -1356,7 +1302,9 @@ begin
   if newTag then begin
     nm := Params.Name;
     if nm = '' then nm := #0;
-    WriteLn('New Attr tag: ', tagName);
+    {$IFDEF DEBUG}
+    DebugLn('New Attr tag: ', tagName);
+    {$ENDIF}
     tag := gtk_text_buffer_create_tag (buffer, pchar(tagName),
         'family-set',     [gboolean(gTRUE),
         'family',         @nm[1],
@@ -1375,11 +1323,13 @@ begin
         'strikethrough-set', gboolean(gTRUE),
         'strikethrough',    gboolean(fsStrikeOut in Params.Style),
         nil]);
-  end else
-    WriteLn('Reusing Attr tag ', tagName);
+  end
+  {$IFDEF DEBUG}
+  else DebugLn('Reusing Attr tag ', tagName)
+  {$ENDIF}
+  ;
 
   ApplyTag(buffer, tag, TextStart, TextLen, false, newTag);
-  //DumpTagTable(buffer, 'SetTextAttributes');
   FormatSubSuperScript(buffer, Params.VScriptPos, Params.Size, TextStart, TextLen);
 end;
 
@@ -1433,7 +1383,9 @@ begin
       nil]);
   ApplyTag(buffer, tag, TextStart, TextLen, true);
 
+  {$IFDEF DEBUG}
   DumpTagTable(buffer, 'SetParaAlignment');
+  {$ENDIF}
 end;
 
 class function TGtk2WSCustomRichMemo.GetParaMetric(
@@ -1528,12 +1480,16 @@ begin
   GetWidgetBuffer(AWinControl, w, buffer);
 
   tagTable := gtk_text_buffer_get_tag_table(buffer);
+  {$IFDEF DEBUG}
   count := gtk_text_tag_table_get_size(tagTable);
+  {$ENDIF}
 
   tag := gtk_text_tag_table_lookup( tagTable, pchar(tagName));
   isNewTag := tag=nil;
   if isNewTag then begin
-    //WriteLn('FirstTime Tag: ', tagname, ' previous tag count=', count);
+    {$IFDEF DEBUG}
+    DebugLn('FirstTime Tag: %s Previous tag count=%d', [tagname, count]);
+    {$ENDIF}
     tag := gtk_text_buffer_create_tag (buffer, pchar(tagName),
         'pixels-above-lines',   [ pixels_above,
         'pixels-above-lines-set', gboolean(gTRUE),
@@ -1549,7 +1505,9 @@ begin
         'pixels-inside_wrap-set', gboolean(gTRUE),
         nil]);
   end
-  //else WriteLn('reused tag: ', tagname,' there are ', count,' tags in table')
+  {$IFDEF DEBUG}
+  //else DebugLn('reused tag: %s there are %d tags in table', [tagname, count])
+  {$ENDIF}
   ;
   ApplyTag(buffer, tag, TextStart, TextLen, true, isNewTag);
 end;
@@ -1702,7 +1660,9 @@ begin
       'tabs-set', gboolean(AStopList.Count>0),
       nil]);
   ApplyTag(buffer, tag, TextStart, TextLen, true);
-  WriteLn('Applied TABs tag');
+  {$IFDEF DEBUG}
+  DebugLn('Applied TABs tag');
+  {$ENDIF}
   if Assigned(parr) then pango_tab_array_free(parr);
 end;
 
