@@ -274,7 +274,7 @@ var
   tag: Pointer;
 begin
   table := gtk_text_buffer_get_tag_table(buffer);
-  DebugLn('%s Count=%d:', [msg,' Count=', gtk_text_tag_table_get_size(table) ,':');
+  DebugLn('%s Count=%d:', [msg, gtk_text_tag_table_get_size(table)]);
 
   List := TList.Create;
   gtk_text_tag_table_foreach(table, @CollectTags, List);
