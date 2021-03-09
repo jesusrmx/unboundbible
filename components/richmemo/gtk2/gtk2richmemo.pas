@@ -346,6 +346,27 @@ begin
   List.Free;
 end;
 
+procedure gtk_text_buffer_copy_tags_from_offset(buffer: PGtkTextBuffer;
+  srcIter: PGtkTextIter; dstOffset, dstLen: Integer);
+var
+  tags, tagItem: PGSList;
+  iStart, iEnd: TGtkTextIter;
+begin
+  tags := gtk_text_iter_get_tags(srcIter);
+  gtk_text_buffer_get_iter_at_offset (buffer, @iStart, dstOffset);
+  gtk_text_buffer_get_iter_at_offset (buffer, @iEnd, dstOffset+dstLen);
+
+  tagItem := tags;
+  while (tagItem<>nil) do begin
+    if tagItem^.data<>nil then
+       gtk_text_buffer_apply_tag(buffer, PGtkTextTag(tagItem^.data), @iStart, @iEnd);
+    tagItem := tagItem^.next;
+  end;
+
+  if tags<>nil then
+    g_slist_free(tags);
+end;
+
 function gtk_text_buffer_get_linkref_tag_at_offset(buffer: PGtkTextBuffer;
   offset: Integer): PGtkTextTag;
 var
@@ -1041,7 +1062,7 @@ begin
     gtk_text_iter_forward_to_line_end(@iend);
   end;
   gtk_text_buffer_apply_tag(abuffer, tag, @istart, @iend);
-  if isNewTag then begin
+  if not isNewTag then begin
     table := gtk_text_buffer_get_tag_table(abuffer);
     count := gtk_text_tag_table_get_size(table);
     gtk_text_tag_set_priority(tag, count-1);
@@ -1619,18 +1640,24 @@ begin
       gtk_text_buffer_delete(b, @istart, @iend);
       gtk_text_buffer_get_iter_at_offset (b, @istart, ofs);
     end;
-    // insert new number
-    gtk_text_buffer_insert(b, @istart, @txt[1], length(txt));
 
-    // restoring iterators
-    gtk_text_buffer_get_iter_at_offset (b, @istart, ofs);
-    gtk_text_iter_set_line_offset(@istart, 0);
-    iend := istart;
+    if ANumber.Style<>pnNone then begin
+      // insert new number
+      gtk_text_buffer_insert(b, @istart, @txt[1], length(txt));
 
-    len:=UTF8Length(txt);
-    gtk_text_iter_forward_chars(@iend, len);
-    // aplying tag
-    gtk_text_buffer_apply_tag_by_name(b, TagNameNumeric, @istart, @iend);
+      // apply original tags to new text
+      gtk_text_buffer_copy_tags_from_offset(b, @istart, ofs, length(txt));
+
+      // restoring iterators
+      gtk_text_buffer_get_iter_at_offset (b, @istart, ofs);
+      gtk_text_iter_set_line_offset(@istart, 0);
+      iend := istart;
+
+      len:=UTF8Length(txt);
+      gtk_text_iter_forward_chars(@iend, len);
+      // aplying tag
+      gtk_text_buffer_apply_tag_by_name(b, TagNameNumeric, @istart, @iend);
+    end;
 
     // next line!
     gtk_text_iter_forward_line(@istart);
