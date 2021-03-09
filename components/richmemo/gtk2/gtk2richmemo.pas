@@ -57,7 +57,7 @@ type
       var attr: PGtkTextAttributes; var fp: TFontParams);
 
     class procedure ReApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False; trace: boolean = false; tracelen:Integer=5);
-    class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False);
+    class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False; isNewTag: boolean = false);
     class procedure FormatSubSuperScript(buffer: PGtkTextBuffer; vs: TVScriptPos; fontSizePts: Double; TextStart, TextLen: Integer);
 
   published
@@ -1026,10 +1026,13 @@ begin
 end;
 
 class procedure TGtk2WSCustomRichMemo.ApplyTag(abuffer: PGtkTextBuffer;
-  tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False);
+  tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean;
+  isNewTag: boolean);
 var
   istart : TGtkTextIter;
   iend   : TGtkTextIter;
+  count  : gint;
+  table  : PGtkTextTagTable;
 begin
   gtk_text_buffer_get_iter_at_offset (abuffer, @istart, TextStart);
   gtk_text_buffer_get_iter_at_offset (abuffer, @iend, TextStart+TextLen);
@@ -1038,6 +1041,11 @@ begin
     gtk_text_iter_forward_to_line_end(@iend);
   end;
   gtk_text_buffer_apply_tag(abuffer, tag, @istart, @iend);
+  if isNewTag then begin
+    table := gtk_text_buffer_get_tag_table(abuffer);
+    count := gtk_text_tag_table_get_size(table);
+    gtk_text_tag_set_priority(tag, count-1);
+  end;
 end;
 
 class function TGtk2WSCustomRichMemo.CreateHandle(const AWinControl: TWinControl; const AParams: TCreateParams): TLCLIntfHandle;
@@ -1290,8 +1298,9 @@ var
   tag     : Pointer;
   gcolor  : TGdkColor;
   bgcolor : TGdkColor;
-  nm      , tagName: string;
-  attr: PGtkTextAttributes;
+  nm      : string;
+  tagName : string;
+  newTag  : boolean;
 const
   pu: array [Boolean] of gint = (PANGO_UNDERLINE_NONE, PANGO_UNDERLINE_SINGLE);
   pb: array [Boolean] of gint = (PANGO_WEIGHT_NORMAL, PANGO_WEIGHT_BOLD);
@@ -1322,7 +1331,8 @@ begin
   if fsStrikeOut in Params.Style then tagName += 'S';
 
   tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(buffer), pchar(tagName));
-  if tag=nil then begin
+  newTag := tag=nil;
+  if newTag then begin
     nm := Params.Name;
     if nm = '' then nm := #0;
     WriteLn('New Attr tag: ', tagName);
@@ -1344,12 +1354,11 @@ begin
         'strikethrough-set', gboolean(gTRUE),
         'strikethrough',    gboolean(fsStrikeOut in Params.Style),
         nil]);
-    ApplyTag(buffer, tag, TextStart, TextLen);
-  end else begin
+  end else
     WriteLn('Reusing Attr tag ', tagName);
-    ReApplyTag(buffer, tag, textStart, TextLen);
-  end;
-  DumpTagTable(buffer, 'SetTextAttributes');
+
+  ApplyTag(buffer, tag, TextStart, TextLen, false, newTag);
+  //DumpTagTable(buffer, 'SetTextAttributes');
   FormatSubSuperScript(buffer, Params.VScriptPos, Params.Size, TextStart, TextLen);
 end;
 
@@ -1436,9 +1445,6 @@ begin
   end;
 end;
 
-var
-  nextok:boolean=false;
-
 class procedure TGtk2WSCustomRichMemo.SetParaMetric(
   const AWinControl: TWinControl; TextStart, TextLen: Integer;
   const AMetric: TIntParaMetric);
@@ -1458,6 +1464,7 @@ var
   pixels_inside, count: gint;
   tagName: String;
   tagTable: PGtkTextTagTable;
+  isNewTag: Boolean;
 const
   ScreenDPI = 96; // todo: might change, should be received dynamically
   PageDPI   = 72; // not expected to be changed
@@ -1503,8 +1510,9 @@ begin
   count := gtk_text_tag_table_get_size(tagTable);
 
   tag := gtk_text_tag_table_lookup( tagTable, pchar(tagName));
-  if tag=nil then begin
-    WriteLn('FirstTime Tag: ', tagname, ' previous tag count=', count);
+  isNewTag := tag=nil;
+  if isNewTag then begin
+    //WriteLn('FirstTime Tag: ', tagname, ' previous tag count=', count);
     tag := gtk_text_buffer_create_tag (buffer, pchar(tagName),
         'pixels-above-lines',   [ pixels_above,
         'pixels-above-lines-set', gboolean(gTRUE),
@@ -1519,20 +1527,10 @@ begin
         'pixels-inside-wrap',     pixels_inside,
         'pixels-inside_wrap-set', gboolean(gTRUE),
         nil]);
-    ApplyTag(buffer, tag, TextStart, TextLen, true);
-    nextok := tagname<>'pm:0-0-0_0-0-0';
-  end else begin
-    WriteLn('reused tag: ', tagname,' there are ', count,' tags in table');
-    ReApplyTag(buffer, tag, TextStart, TextLen);
-    //gtk_text_tag_set_priority(tag, );
-    WriteLn('reapplied');
-    if nextok then begin
-      nextok := false;
-      DumpTagTable(buffer, 'SetParaMetric');
-    end;
-  end;
-
-
+  end
+  //else WriteLn('reused tag: ', tagname,' there are ', count,' tags in table')
+  ;
+  ApplyTag(buffer, tag, TextStart, TextLen, true, isNewTag);
 end;
 
 class function TGtk2WSCustomRichMemo.GetParaNumbering(
