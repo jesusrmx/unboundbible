@@ -195,6 +195,7 @@ var
   tagTabCounter: Integer = 0;
   tagLinkCounter: Integer = 0;
   tagZoomCounter: Integer = 0;
+  tagListCounter: Integer = 0;
 
 function GetTagName(baseName: string; var counter: Integer): string;
 begin
@@ -1545,7 +1546,7 @@ var
   b      : PGtkTextBuffer;
   istart : TGtkTextIter;
   iend   : TGtkTextIter;
-  txt    : String;
+  txt    , tagName: String;
   len    : Integer;
   ln     : Integer;
   ls     : Integer;
@@ -1553,6 +1554,8 @@ var
   numidx : Integer;
   tag    : PGtkTextTag;
   attr   : PGtkTextAttributes;
+  leftMargin: gint;
+  isNewTag: Boolean;
 begin
   inherited SetParaNumbering(AWinControl, TextStart, TextLen, ANumber);
   GetWidgetBuffer(AWinControl, w, b);
@@ -1618,8 +1621,23 @@ begin
       // apply indentation
       attr:=GetAttrAtIter(PGtkTextView(w), istart);
       if Assigned(attr) then begin
-        attr^.left_margin := ;
+
+        leftMargin := attr^.left_margin;
+        tagName := 'list:'+IntToStr(leftMargin);
+
+        tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(b), pchar(tagName));
+        isNewTag := tag=nil;
+        if isNewTag then begin
+          tag := gtk_text_buffer_create_tag(b, pchar(tagName),
+              'left_margin', [ gint(leftMargin + 25),
+              'indent',  gInt(-14),
+              'wrap_mode', gint(GTK_WRAP_WORD),
+              nil]);
+        end;
+        ofs := gtk_text_iter_get_offset(@istart);
+        ApplyTag(b, tag, ofs, 0{dummy}, true, isNewTag)
       end;
+
     end;
 
     // next line!
