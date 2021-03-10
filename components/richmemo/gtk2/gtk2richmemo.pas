@@ -59,7 +59,8 @@ type
       var attr: PGtkTextAttributes; var fp: TFontParams);
 
     class procedure ReApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False; trace: boolean = false; tracelen:Integer=5);
-    class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False; isNewTag: boolean = false);
+    class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False; isNewTag: boolean = false); overload;
+    class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; istart, iend: TGtkTextIter; ToParagraphs: Boolean = False; isNewTag: boolean = false); overload;
     class procedure FormatSubSuperScript(buffer: PGtkTextBuffer; vs: TVScriptPos; fontSizePts: Double; TextStart, TextLen: Integer);
 
   published
@@ -995,11 +996,19 @@ class procedure TGtk2WSCustomRichMemo.ApplyTag(abuffer: PGtkTextBuffer;
 var
   istart : TGtkTextIter;
   iend   : TGtkTextIter;
-  count  : gint;
-  table  : PGtkTextTagTable;
 begin
   gtk_text_buffer_get_iter_at_offset (abuffer, @istart, TextStart);
   gtk_text_buffer_get_iter_at_offset (abuffer, @iend, TextStart+TextLen);
+  ApplyTag(abuffer, tag, istart, iend, toParagraphs, isNewTag);
+end;
+
+class procedure TGtk2WSCustomRichMemo.ApplyTag(abuffer: PGtkTextBuffer;
+  tag: PGtkTextTag; istart, iend: TGtkTextIter; ToParagraphs: Boolean;
+  isNewTag: boolean);
+var
+  count  : gint;
+  table  : PGtkTextTagTable;
+begin
   if ToParagraphs then begin
     gtk_text_iter_set_line_offset(@istart, 0);
     gtk_text_iter_forward_to_line_end(@iend);
@@ -1556,6 +1565,7 @@ var
   attr   : PGtkTextAttributes;
   leftMargin: gint;
   isNewTag: Boolean;
+  parr: PPangoTabArray;
 begin
   inherited SetParaNumbering(AWinControl, TextStart, TextLen, ANumber);
   GetWidgetBuffer(AWinControl, w, b);
@@ -1615,27 +1625,32 @@ begin
       len:=UTF8Length(txt);
       gtk_text_iter_forward_chars(@iend, len);
 
-      // aplying tag
+      // applying tag
       gtk_text_buffer_apply_tag_by_name(b, TagNameNumeric, @istart, @iend);
 
-      // apply indentation
+      // apply nice indentation
       attr:=GetAttrAtIter(PGtkTextView(w), istart);
       if Assigned(attr) then begin
 
         leftMargin := attr^.left_margin;
-        tagName := 'list:'+IntToStr(leftMargin);
+        gtk_text_attributes_unref(attr);
 
+        tagName := 'list:'+IntToStr(leftMargin);
         tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(b), pchar(tagName));
         isNewTag := tag=nil;
         if isNewTag then begin
+          parr:=pango_tab_array_new(2, true);
+          pango_tab_array_set_tab(parr, 0, PANGO_TAB_LEFT, 0);
+          pango_tab_array_set_tab(parr, 1, PANGO_TAB_LEFT, 14);
           tag := gtk_text_buffer_create_tag(b, pchar(tagName),
               'left_margin', [ gint(leftMargin + 25),
               'indent',  gInt(-14),
               'wrap_mode', gint(GTK_WRAP_WORD),
+              'tabs', parr,
               nil]);
         end;
-        ofs := gtk_text_iter_get_offset(@istart);
-        ApplyTag(b, tag, ofs, 0{dummy}, true, isNewTag)
+
+        ApplyTag(b, tag, istart, iend, false, isNewTag)
       end;
 
     end;
