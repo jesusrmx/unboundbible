@@ -169,6 +169,8 @@ const
   SubSuperFontKoef = 0.583; // the koef for the font size of sub/super scripts matching Adover Illustrator and OpenOffice
   SuperRiseKoef =  0.58;
   SubRiseKoef   = -0.08;
+  PageDPI       = 72; // not expected to be changed
+  ScreenDPI     : Integer = 96; // todo: might change, should be received dynamically
 
 implementation
 
@@ -407,9 +409,6 @@ var
   st  : TPangoStyle;
   pf  : PPangoFontDescription;
   sz  : double;
-const
-  ScreenDPI = 96; // todo: might change, should be received dynamically
-  PageDPI   = 72; // not expected to be changed
 begin
   InitFontParams(FontParams);
 
@@ -1392,16 +1391,14 @@ class function TGtk2WSCustomRichMemo.GetParaMetric(
   const AWinControl: TWinControl; TextStart: Integer;
   var AMetric: TIntParaMetric): Boolean;
 var
-  attr : PGtkTextAttributes;
-  fp   : TFontParams;
-const
-  ScreenDPI = 96; // todo: might change, should be received dynamically
-  PageDPI   = 72; // not expected to be changed
-  PixToPt   = PageDPI / ScreenDPI;
+  attr    : PGtkTextAttributes;
+  fp      : TFontParams;
+  PixToPt : double;
 begin
   GetAttributesAt(AWinControl, TextStart, true, attr, fp);
   Result := Assigned(attr);
   if Result then begin
+    PixToPt := PageDPI / ScreenDPI;
     if attr^.indent<0 then begin
       AMetric.FirstLine:=(attr^.left_margin)*PixToPt;
       AMetric.HeadIndent:=(-attr^.indent+attr^.left_margin)*PixToPt;
@@ -1555,6 +1552,7 @@ var
   ofs    : Integer;
   numidx : Integer;
   tag    : PGtkTextTag;
+  attr   : PGtkTextAttributes;
 begin
   inherited SetParaNumbering(AWinControl, TextStart, TextLen, ANumber);
   GetWidgetBuffer(AWinControl, w, b);
@@ -1613,8 +1611,15 @@ begin
 
       len:=UTF8Length(txt);
       gtk_text_iter_forward_chars(@iend, len);
+
       // aplying tag
       gtk_text_buffer_apply_tag_by_name(b, TagNameNumeric, @istart, @iend);
+
+      // apply indentation
+      attr:=GetAttrAtIter(PGtkTextView(w), istart);
+      if Assigned(attr) then begin
+        attr^.left_margin := ;
+      end;
     end;
 
     // next line!
