@@ -1612,6 +1612,7 @@ begin
         tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(b), pchar(tagName));
         isNewTag := tag=nil;
         if isNewTag then begin
+          // ref: https://stackoverflow.com/a/63291090
           parr:=pango_tab_array_new(2, true);
           pango_tab_array_set_tab(parr, 0, PANGO_TAB_LEFT, 0);
           pango_tab_array_set_tab(parr, 1, PANGO_TAB_LEFT, 14);
