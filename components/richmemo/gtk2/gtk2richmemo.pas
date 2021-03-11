@@ -58,7 +58,6 @@ type
     class procedure GetAttributesAt(const AWinControl: TWinControl; TextStart: Integer; APara: Boolean;
       var attr: PGtkTextAttributes; var fp: TFontParams);
 
-    class procedure ReApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False; trace: boolean = false; tracelen:Integer=5);
     class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False; isNewTag: boolean = false); overload;
     class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; istart, iend: TGtkTextIter; ToParagraphs: Boolean = False; isNewTag: boolean = false); overload;
     class procedure FormatSubSuperScript(buffer: PGtkTextBuffer; vs: TVScriptPos; fontSizePts: Double; TextStart, TextLen: Integer);
@@ -171,6 +170,8 @@ const
   SuperRiseKoef =  0.58;
   SubRiseKoef   = -0.08;
   PageDPI       = 72; // not expected to be changed
+
+const
   ScreenDPI     : Integer = 96; // todo: might change, should be received dynamically
 
 implementation
@@ -964,32 +965,6 @@ begin
   Result := GetAttrAtIter(PGtkTextView(TextWidget), iter);
 end;
 
-class procedure TGtk2WSCustomRichMemo.ReApplyTag(abuffer: PGtkTextBuffer;
-  tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean;
-  trace: boolean; tracelen: Integer);
-var
-  istart : TGtkTextIter;
-  iend   : TGtkTextIter;
-  offset, count: gint;
-  tagTable: PGtkTextTagTable;
-begin
-  gtk_text_buffer_get_iter_at_offset (abuffer, @istart, TextStart);
-  gtk_text_buffer_get_iter_at_offset (abuffer, @iend, TextStart+TextLen);
-  if ToParagraphs then begin
-    gtk_text_iter_set_line_offset(@istart, 0);
-    gtk_text_iter_forward_to_line_end(@iend);
-  end;
-
-  offset := gtk_text_iter_get_offset(@istart);
-  //if trace then DumpTagsAt('BefRmv: ', abuffer, offset, tracelen);
-  tagTable := gtk_text_buffer_get_tag_table(abuffer);
-  count    := gtk_text_tag_table_get_size(tagTable);
-  gtk_text_tag_set_priority(tag, count-1);
-  //if trace then DumpTagsAt('areTag: ', abuffer, offset, tracelen);
-  gtk_text_buffer_apply_tag(abuffer, tag, @istart, @iend);
-  //if trace then DumpTagsAt('AftApp: ', abuffer, offset, tracelen);
-end;
-
 class procedure TGtk2WSCustomRichMemo.ApplyTag(abuffer: PGtkTextBuffer;
   tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean;
   isNewTag: boolean);
@@ -1439,16 +1414,13 @@ var
   attr   : PGtkTextAttributes;
   fp     : TFontParams;
   iter   : TGtkTextIter;
+  DPIFactor: Double;
 
   left_margin, indent, right_margin, pixels_above, pixels_below,
   pixels_inside, count: gint;
   tagName: String;
   tagTable: PGtkTextTagTable;
   isNewTag: Boolean;
-const
-  ScreenDPI = 96; // todo: might change, should be received dynamically
-  PageDPI   = 72; // not expected to be changed
-  DPIFactor = ScreenDPI / PageDPI;
 begin
   h:=AMetric.HeadIndent;
   if h<0 then h:=0;
@@ -1473,6 +1445,7 @@ begin
 
   GetAttributesAt(AWinControl, TextStart, true, attr, fp);
   gtk_text_attributes_unref(attr);
+  DPIFactor := ScreenDPI / PageDPI;
 
   left_margin   := gint(round(h*DPIFactor));
   indent        := gint(round(fl*DPIFactor));
@@ -1673,10 +1646,7 @@ var
   parr   : PPangoTabArray;
   i      : Integer;
   tagName: String;
-const
-  ScreenDPI = 96; // todo: might change, should be received dynamically
-  PageDPI   = 72; // not expected to be changed
-  DPIFactor = ScreenDPI / PageDPI;
+  DPIFactor: double;
 begin
   GetWidgetBuffer(AWinControl, w, buffer);
   if not Assigned(w) or not Assigned(buffer) then Exit;
@@ -1686,6 +1656,7 @@ begin
   if AStopList.Count=0 then
     parr:=nil
   else begin
+    DPIFactor := ScreenDPI / PageDPI;
     parr:=pango_tab_array_new(AStopList.Count, true);
     for i:=0 to AStopList.Count-1 do begin
       pango_tab_array_set_tab(parr, i, PANGO_TAB_LEFT, round(AStopList.Tabs[i].Offset * DPIFactor) );
@@ -1707,10 +1678,6 @@ end;
 class function TGtk2WSCustomRichMemo.GetParaTabs(
   const AWinControl: TWinControl; TextStart: integer;
   var AStopList: TTabStopList): Boolean;
-const
-  ScreenDPI = 96; // todo: might change, should be received dynamically
-  PageDPI   = 72; // not expected to be changed
-  PixToPt   = PageDPI / ScreenDPI;
 var
   i      : Integer;
   attr   : PGtkTextAttributes;
@@ -1727,7 +1694,7 @@ begin
   AStopList.Count:=pango_tab_array_get_size(attr^.tabs);
   if AStopList.Count=0 then Exit;
 
-  f := PixToPt;
+  f := PageDPI / ScreenDPI;
   if not pango_tab_array_get_positions_in_pixels(attr^.tabs) then
     f:= f / PANGO_SCALE;
 
@@ -1950,16 +1917,14 @@ var
   istart: TGtkTextIter;
   pix: PGdkPixbuf;
   err: PGError;
-const
-  ScreenDPI = 96; // todo: might change, should be received dynamically
-  PageDPI   = 72; // not expected to be changed
-  DPIFactor = ScreenDPI / PageDPI;
+  DPIFactor: Double;
 begin
   Result:=false;
   GetWidgetBuffer(ARichMemo, t, b);
   if not Assigned(b) then Exit;
 
   err:=nil;
+  DPIFactor := ScreenDPI / PageDPI;
 
   if (AImgSize.cx=0) and (AImgSize.cy=0) then
     pix := gdk_pixbuf_new_from_file(PChar(FileNameUTF8), @err)
@@ -2095,10 +2060,7 @@ var
   gi     : TGtk2InlineObject;
   draw   : PGtkWidget;
   sz     : TSize;
-const
-  ScreenDPI = 96; // todo: might change, should be received dynamically
-  PageDPI   = 72; // not expected to be changed
-  DPIFactor = ScreenDPI / PageDPI;
+  DPIFactor: double;
 begin
   Result:=false;
   GetWidgetBuffer(AWinControl, w, b);
@@ -2112,6 +2074,7 @@ begin
   draw:=gtk_drawing_area_new;
   ConnectSignal( PGtkObject(draw), 'expose-event', @GtkDrawableDraw, gi);
 
+  DPIFactor := ScreenDPI / PageDPI;
   sz.cx:=round(ASize.cx * DPIFactor);
   sz.cy:=round(ASize.cy * DPIFactor);
   gtk_widget_set_size_request(draw, sz.cx, sz.cy);
