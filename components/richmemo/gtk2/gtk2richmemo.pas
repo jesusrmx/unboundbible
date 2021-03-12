@@ -1723,8 +1723,8 @@ begin
     Exit;
   end;
   gtk_text_buffer_get_iter_at_offset (b, @istart, TextStart);
-  gtk_text_buffer_get_iter_at_offset (b, @iend, TextStart);
   gtk_text_iter_set_line_offset(@istart, 0);
+  iend := istart;
   gtk_text_iter_forward_to_line_end(@iend);
   rng.start:=gtk_text_iter_get_offset(@istart);
   rng.lengthNoBr:=gtk_text_iter_get_offset(@iend)-rng.start;
