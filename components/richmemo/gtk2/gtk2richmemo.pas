@@ -1539,6 +1539,7 @@ var
   leftMargin: gint;
   isNewTag: Boolean;
   parr: PPangoTabArray;
+  Rich: TCustomRichMemo;
 begin
   inherited SetParaNumbering(AWinControl, TextStart, TextLen, ANumber);
   GetWidgetBuffer(AWinControl, w, b);
@@ -1605,6 +1606,7 @@ begin
       attr:=GetAttrAtIter(PGtkTextView(w), istart);
       if Assigned(attr) then begin
 
+        Rich := TCustomRichMemo(AWinControl);
         leftMargin := attr^.left_margin;
         gtk_text_attributes_unref(attr);
 
@@ -1615,10 +1617,10 @@ begin
           // ref: https://stackoverflow.com/a/63291090
           parr:=pango_tab_array_new(2, true);
           pango_tab_array_set_tab(parr, 0, PANGO_TAB_LEFT, 0);
-          pango_tab_array_set_tab(parr, 1, PANGO_TAB_LEFT, 14);
+          pango_tab_array_set_tab(parr, 1, PANGO_TAB_LEFT, rich.ListTabWidth);
           tag := gtk_text_buffer_create_tag(b, pchar(tagName),
-              'left_margin', [ gint(leftMargin + 25),
-              'indent',  gInt(-14),
+              'left_margin', [ gint(leftMargin + rich.ListMargin),
+              'indent',  gInt(-rich.ListIndent),
               'wrap_mode', gint(GTK_WRAP_WORD),
               'tabs', parr,
               nil]);

@@ -211,6 +211,9 @@ type
     fOnLinkAction       : TLinkActionEvent;
     fZoomFactor         : Double;
   private
+    fListIndent: Integer;
+    fListMargin: Integer;
+    fListTabWidth: Integer;
     fLoadingMode: TLoadingMode;
     procedure InlineInvalidate(handler: TRichMemoInline);
 
@@ -302,6 +305,10 @@ type
     property OnLinkAction: TLinkActionEvent read fOnLinkAction write fOnLinkAction;
     property CanRedo: Boolean read GetCanRedo;
     property LoadingMode: TLoadingMode read fLoadingMode write fLoadingMode;
+
+    property ListMargin: Integer read fListMargin write fListMargin;
+    property ListTabWidth: Integer read fListTabWidth write fListTabWidth;
+    property ListIndent: Integer read fListIndent write fListIndent;
   end;
   
   { TRichMemo }
@@ -915,6 +922,9 @@ constructor TCustomRichMemo.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   fZoomFactor:=1;
+  fListTabWidth := 14;
+  fListMargin := 25;
+  fListIndent := 14;
 end;
 
 
