@@ -245,6 +245,7 @@ type
     procedure CutToClipboard; override;
     procedure PasteFromClipboard; override;
     function CanPaste: Boolean; virtual;
+    procedure UTF8KeyPress(var UTF8Key: TUTF8Char); override;
     procedure BeginUpdate;
     procedure EndUpdate;
     procedure LoadFromChunkArray(chunks: TRTFChunkArray);
@@ -953,6 +954,16 @@ begin
     Result:=TWSCustomRichMemoClass(WidgetSetClass).CanPasteFromClipboard(Self)
   else
     Result:=false;
+end;
+
+procedure TCustomRichMemo.UTF8KeyPress(var UTF8Key: TUTF8Char);
+begin
+  if (SelLength=0) and (UTF8Key=#13) then
+    if TWSCustomRichMemoClass(WidgetSetClass).HandleKeyPress(Self, UTF8Key) then begin
+      UTF8Key := #0;
+      exit;
+    end;
+  inherited UTF8KeyPress(UTF8Key);
 end;
 
 procedure TCustomRichMemo.BeginUpdate;

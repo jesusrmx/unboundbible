@@ -47,6 +47,9 @@ type
   { TWSCustomRichMemo }
 
   TWSCustomRichMemo = class(TWSCustomMemo)
+  protected
+    class function GetListItem(rich: TCustomRichMemo; out bulletText:string;
+      out itemText:string; out pn:TParaNumbering): boolean; virtual;
   published
     //Note: RichMemo cannot use LCL TCustomEdit copy/paste/cut operations
     //      because there's no support for (system native) RICHTEXT clipboard format
@@ -55,6 +58,7 @@ type
     class procedure CopyToClipboard(const AWinControl: TWinControl); virtual;
     class procedure PasteFromClipboard(const AWinControl: TWinControl); virtual;
     class function CanPasteFromClipboard(const AWinControl: TWinControl): Boolean; virtual;
+    class function HandleKeyPress(const AWinControl: TWinControl; key:TUTF8Char): boolean; virtual;
 
     class procedure BeginUpdate(const AWinControl: TWinControl); virtual;
     class procedure EndUpdate(const AWinControl: TWinControl); virtual;
@@ -136,6 +140,17 @@ implementation
 
 { TWSCustomRichMemo }
 
+class function TWSCustomRichMemo.GetListItem(rich: TCustomRichMemo; out
+  bulletText: string; out itemText: string; out pn: TParaNumbering): boolean;
+begin
+  bulletText := '';
+  itemText := '';
+  InitParaNumbering(pn);
+  result := rich.GetParaNumbering(rich.SelStart, pn) and (pn.Style<>pnNone);
+  if not result then
+    exit; // is not a list item
+end;
+
 class procedure TWSCustomRichMemo.CutToClipboard(const AWinControl: TWinControl); 
 begin
 
@@ -155,6 +170,42 @@ class function TWSCustomRichMemo.CanPasteFromClipboard(
   const AWinControl: TWinControl): Boolean;
 begin
   Result := true;
+end;
+
+class function TWSCustomRichMemo.HandleKeyPress(
+  const AWinControl: TWinControl; key: TUTF8Char): boolean;
+var
+  rich: TCustomRichMemo;
+  orgPos, newPos: Integer;
+  paraRange: TParaRange;
+  pn: TParaNumbering;
+  bulletText, itemText: string;
+begin
+
+  result := false;
+  rich := TCustomRichMemo(AWinControl);
+  if not rich.HandleAllocated then
+    exit;
+
+  rich := TCustomRichMemo(AWinControl);
+
+  if not GetListItem(rich, bulletText, itemText, pn) then
+    exit;
+
+  orgPos := rich.selStart;
+  rich.GetParaRange(orgPos, paraRange);
+
+
+  // if key is "RETURN" and para length=bullet length then this line should "de listed"
+  // if key is "RETURN" and para length>bullet length then this line should "split"
+  //     the rest of the line should form a new list item, if apply, items should be renumbered
+  // if key is "BACKSPACE" and para length=bullet length then this line should be left with only indentation.
+
+  newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
+
+  rich.GetParaRange(newPos, paraRange);
+
+  result := true;
 end;
 
 class procedure TWSCustomRichMemo.BeginUpdate(const AWinControl: TWinControl);
