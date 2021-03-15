@@ -142,6 +142,9 @@ implementation
 
 class function TWSCustomRichMemo.GetListItem(rich: TCustomRichMemo; out
   bulletText: string; out itemText: string; out pn: TParaNumbering): boolean;
+var
+  rng: TParaRange;
+  i: SizeInt;
 begin
   bulletText := '';
   itemText := '';
@@ -149,6 +152,13 @@ begin
   result := rich.GetParaNumbering(rich.SelStart, pn) and (pn.Style<>pnNone);
   if not result then
     exit; // is not a list item
+  GetParaRange(rich, rich.SelStart, rng);
+  bulletText := rich.GetText(rng.start, rng.lengthNoBr);
+  i := pos(#9, bulletText);
+  if i>0 then begin
+    itemText := system.copy(bulletText, i+1, Length(bulletText));
+    SetLength(bulletText, i-1);
+  end;
 end;
 
 class procedure TWSCustomRichMemo.CutToClipboard(const AWinControl: TWinControl); 
@@ -179,7 +189,7 @@ var
   orgPos, newPos: Integer;
   paraRange: TParaRange;
   pn: TParaNumbering;
-  bulletText, itemText: string;
+  bulletText, itemText, remText: string;
 begin
 
   result := false;
@@ -190,20 +200,28 @@ begin
   if not GetListItem(rich, bulletText, itemText, pn) then
     exit;
 
-  orgPos := rich.selStart;
-  rich.GetParaRange(orgPos, paraRange);
-
-
-  // if key is "RETURN" and para length=bullet length then this line should "de listed"
-  // if key is "RETURN" and para length>bullet length then this line should "split"
-  //     the rest of the line should form a new list item, if apply, items should be renumbered
-  // if key is "BACKSPACE" and para length=bullet length then this line should be left with only indentation.
-
-  newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
-
-  rich.GetParaRange(newPos, paraRange);
-
-  result := true;
+  case key of
+    #13:
+      case pn.Style of
+        pnNumber:
+          begin
+            orgPos := rich.selStart;
+            rich.GetParaRange(orgPos, paraRange);
+            remText := rich.GetText(orgPos, paraRange.Start + paraRange.lengthNoBr - orgPos);
+            if remText='' then
+              // de list
+              result := false
+            else begin
+              // split
+              newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
+              rich.GetParaRange(newPos, paraRange);
+              inc(pn.NumberStart);
+              rich.SetParaNumbering(newPos, paraRange.lengthNoBr, pn);
+              result := true;
+            end;
+          end;
+      end;
+  end;
 end;
 
 class procedure TWSCustomRichMemo.BeginUpdate(const AWinControl: TWinControl);

@@ -373,10 +373,13 @@ begin
     if pos('list:', tag^.name)=1 then begin
       result := true;
       tagName := copy(tag^.name, 6, 255);
-      i := pos('_', tagName);
+      i := 1;
       pn.Style := TParaNumStyle(NextField(tagName, '_', i, 0));
       sepPos := NextField(tagName, '_', i, 0);
       tagText := gtk_text_iter_get_text(iStart, iEnd);
+      dec(sepPos);
+      if SepPos>0 then
+        pn.SepChar := tagText[sepPos]; // tagText is pchar
       case pn.Style of
         pnNumber:
           pn.NumberStart := StrToIntDef(copy(tagText, 1, sepPos), 1);
