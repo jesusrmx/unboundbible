@@ -337,6 +337,59 @@ begin
     g_slist_free(tags);
 end;
 
+function NextField(const text:string; sep:char; var index:Integer): string; overload;
+var
+  prev: Integer;
+begin
+  result := '';
+  while index<=length(text) do begin
+    inc(index);
+    if text[index-1]=sep then
+      break;
+    result := result + text[index-1];
+  end;
+end;
+
+function NextField(const text:string; sep:char; var index:Integer; def:Integer): Integer; overload;
+begin
+  result := StrToIntDef(NextField(text, sep, index), def);
+end;
+
+function gtk_text_iter_get_numbering(iStart, iEnd: PGtkTextIter; out pn: TParaNumbering): boolean;
+var
+  tags, tagItem: PGSList;
+  tagText, p: pgchar;
+  tag: PGtkTextTag;
+  tagName: string;
+  i, sepPos: Integer;
+begin
+
+  result := false;
+  tags := gtk_text_iter_get_tags(iStart);
+
+  tagItem := tags;
+  while (tagItem<>nil) do begin
+    tag := PGtkTextTag(tagItem^.data);
+    if pos('list:', tag^.name)=1 then begin
+      result := true;
+      tagName := copy(tag^.name, 6, 255);
+      i := pos('_', tagName);
+      pn.Style := TParaNumStyle(NextField(tagName, '_', i, 0));
+      sepPos := NextField(tagName, '_', i, 0);
+      tagText := gtk_text_iter_get_text(iStart, iEnd);
+      case pn.Style of
+        pnNumber:
+          pn.NumberStart := StrToIntDef(copy(tagText, 1, sepPos), 1);
+      end;
+      break;
+    end;
+    tagItem := tagItem^.next;
+  end;
+
+  if tags<>nil then
+    g_slist_free(tags);
+end;
+
 procedure gtk_text_buffer_split_tags_at_offset(widget: PGtkWidget; buffer: PGtkTextBuffer;
   offset, splitLen: Integer);
 var
@@ -1499,9 +1552,12 @@ var
   w: PGtkWidget;
   b: PGtkTextBuffer;
   tag: PGtkTextTag;
-  istart: TGtkTextIter;
+  istart, iend: TGtkTextIter;
+  tagText: pgchar;
+  tagName: string;
 begin
 
+  result := false;
   GetWidgetBuffer(AWinControl, w, b);
   if not Assigned(w) or not Assigned(b) then Exit;
 
@@ -1515,8 +1571,13 @@ begin
 
   if gtk_text_iter_begins_tag(@istart, tag) then begin
 
-    ANumber.Style := pnBullet;
+    iend := iStart;
+    gtk_text_iter_forward_to_tag_toggle(@iend, tag);
 
+    tagText := gtk_text_iter_get_text(@istart, @iend);
+    result := tagText<>nil;
+    if result then
+      result := gtk_text_iter_get_numbering(@istart, @iend, ANumber);
   end;
 end;
 
@@ -1536,7 +1597,7 @@ var
   numidx : Integer;
   tag    : PGtkTextTag;
   attr   : PGtkTextAttributes;
-  leftMargin: gint;
+  leftMargin, sepPos: gint;
   isNewTag: Boolean;
   parr: PPangoTabArray;
   Rich: TCustomRichMemo;
@@ -1568,8 +1629,12 @@ begin
       pnUpRoman:   txt := 'I';
       pnCustomChar: txt:= UTF8Encode(ANumber.CustomChar);
     end;
-    if not (ANumber.Style in [pnBullet, pnCustomChar]) and (ANumber.SepChar<>#0) then
+    sepPos := 0;
+    if not (ANumber.Style in [pnBullet, pnCustomChar]) and (ANumber.SepChar<>#0) then begin
+      sepPos := Length(txt)+1; // byte Pos
       txt:=txt+UTF8Encode(ANumber.SepChar);
+    end else
+      sepPos := Length(txt)+1;
     txt:=txt+TabChar;
 
     //gtk_text_buffer_get_iter_at_offset (b, @iend, TextStart);
@@ -1610,7 +1675,8 @@ begin
         leftMargin := attr^.left_margin;
         gtk_text_attributes_unref(attr);
 
-        tagName := format('list:%d_%d_%d_%d',[leftMargin, rich.ListMargin, rich.ListIndent, rich.ListTabWidth]);
+        tagName := format('list:%d_%d_%d_%d_%d_%d',
+          [ord(ANumber.Style), sepPos, leftMargin, rich.ListMargin, rich.ListIndent, rich.ListTabWidth]);
         tag := gtk_text_tag_table_lookup( gtk_text_buffer_get_tag_table(b), pchar(tagName));
         isNewTag := tag=nil;
         if isNewTag then begin

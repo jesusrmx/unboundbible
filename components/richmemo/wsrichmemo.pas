@@ -187,8 +187,6 @@ begin
   if not rich.HandleAllocated then
     exit;
 
-  rich := TCustomRichMemo(AWinControl);
-
   if not GetListItem(rich, bulletText, itemText, pn) then
     exit;
 
