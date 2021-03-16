@@ -203,7 +203,7 @@ begin
   case key of
     #13:
       case pn.Style of
-        pnNumber, pnBullet:
+        pnNumber, pnBullet, pnLowLetter, pnUpLetter, pnLowRoman, pnUpRoman:
           begin
             result := true;
             orgPos := rich.selStart;

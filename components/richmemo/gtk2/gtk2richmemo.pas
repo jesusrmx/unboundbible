@@ -29,7 +29,7 @@ uses
   // Bindings
   gtk2, glib2, gdk2, pango,
   // RTL/FCL
-  Types, Classes, SysUtils,
+  Types, Classes, SysUtils, StrUtils,
   // LCL
   LCLType, Controls, Graphics, LazUTF8, StdCtrls, LCLProc, {$IFDEF Debug} LazLogger,{$ENDIF}
   // Gtk2 widget
@@ -383,6 +383,12 @@ begin
       case pn.Style of
         pnNumber:
           pn.NumberStart := StrToIntDef(copy(tagText, 1, sepPos), 1);
+        pnLowLetter:
+          pn.NumberStart := ord(tagText[0]) - ord('a') + 1;
+        pnUpLetter:
+          pn.NumberStart := ord(tagText[0]) - ord('A') + 1;
+        pnLowRoman, pnUpRoman:
+          pn.NumberStart := RomanToIntDef(copy(tagText, 1, sepPos), 1);
       end;
       break;
     end;
@@ -1619,17 +1625,18 @@ begin
   ls:=gtk_text_iter_get_line(@iend);
 
   numidx:=1;
-  if ANumber.Style=pnNumber then numidx:=ANumber.NumberStart;
+  if ANumber.Style in [pnNumber..pnUpRoman] then
+    numidx:=ANumber.NumberStart;
 
   repeat
     gtk_text_iter_set_line_offset(@istart, 0);
     case ANumber.Style of
       pnBullet: txt := BulletChar;
       pnNumber: txt := IntToStr(numidx);
-      pnLowLetter: txt := 'a';
-      pnLowRoman:  txt := 'i';
-      pnUpLetter:  txt := 'A';
-      pnUpRoman:   txt := 'I';
+      pnLowLetter: txt := chr( ord('a') + numidx - 1);
+      pnLowRoman:  txt := lowercase(IntToRoman(numidx));
+      pnUpLetter:  txt := chr( ord('A') + numidx - 1);
+      pnUpRoman:   txt := IntToRoman(numidx);
       pnCustomChar: txt:= UTF8Encode(ANumber.CustomChar);
     end;
     sepPos := 0;
