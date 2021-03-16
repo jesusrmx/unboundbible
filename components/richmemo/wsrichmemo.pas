@@ -157,7 +157,7 @@ begin
   i := pos(#9, bulletText);
   if i>0 then begin
     itemText := system.copy(bulletText, i+1, Length(bulletText));
-    SetLength(bulletText, i-1);
+    SetLength(bulletText, i);
   end;
 end;
 
@@ -189,7 +189,7 @@ var
   orgPos, newPos: Integer;
   paraRange: TParaRange;
   pn: TParaNumbering;
-  bulletText, itemText, remText: string;
+  bulletText, itemText: string;
 begin
 
   result := false;
@@ -203,17 +203,15 @@ begin
   case key of
     #13:
       case pn.Style of
-        pnNumber:
+        pnNumber, pnBullet:
           begin
             result := true;
             orgPos := rich.selStart;
             rich.GetParaRange(orgPos, paraRange);
             if itemText='' then begin
-              // This line should disappear
-              rich.InDelText('', paraRange.start, Length(bulletText));
+              rich.InDelText('', paraRange.start, UTF8Length(bulletText));
               exit;
             end;
-            remText := rich.GetText(orgPos, paraRange.Start + paraRange.lengthNoBr - orgPos);
             newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
             rich.GetParaRange(newPos, paraRange);
             inc(pn.NumberStart);
