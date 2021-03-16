@@ -50,6 +50,7 @@ type
   protected
     class function GetListItem(rich: TCustomRichMemo; out bulletText:string;
       out itemText:string; out pn:TParaNumbering): boolean; virtual;
+    class procedure ClearParagraph(rich: TCustomRichMemo; TextPos: Integer); virtual;
   published
     //Note: RichMemo cannot use LCL TCustomEdit copy/paste/cut operations
     //      because there's no support for (system native) RICHTEXT clipboard format
@@ -161,6 +162,12 @@ begin
   end;
 end;
 
+class procedure TWSCustomRichMemo.ClearParagraph(rich: TCustomRichMemo;
+  TextPos: Integer);
+begin
+
+end;
+
 class procedure TWSCustomRichMemo.CutToClipboard(const AWinControl: TWinControl); 
 begin
 
@@ -209,7 +216,7 @@ begin
             orgPos := rich.selStart;
             rich.GetParaRange(orgPos, paraRange);
             if itemText='' then begin
-              rich.InDelText('', paraRange.start, UTF8Length(bulletText));
+              ClearParagraph(Rich, orgPos);
               exit;
             end;
             newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;

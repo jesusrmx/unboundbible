@@ -61,6 +61,7 @@ type
     class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; TextStart, TextLen: Integer; ToParagraphs: Boolean = False; isNewTag: boolean = false); overload;
     class procedure ApplyTag(abuffer: PGtkTextBuffer; tag: PGtkTextTag; istart, iend: TGtkTextIter; ToParagraphs: Boolean = False; isNewTag: boolean = false); overload;
     class procedure FormatSubSuperScript(buffer: PGtkTextBuffer; vs: TVScriptPos; fontSizePts: Double; TextStart, TextLen: Integer);
+    class procedure ClearParagraph(rich: TCustomRichMemo; TextPos: Integer); override;
 
   published
     class function CreateHandle(const AWinControl: TWinControl; const AParams: TCreateParams): TLCLIntfHandle; override;
@@ -1274,6 +1275,23 @@ begin
     DebugLn('Applied Sub or Super Script Tags');
     {$ENDIF}
   end;
+end;
+
+class procedure TGtk2WSCustomRichMemo.ClearParagraph(rich: TCustomRichMemo;
+  TextPos: Integer);
+var
+  rng     : TParaRange;
+  v       : PGtkTextView;
+  b       : PGtkTextBuffer;
+  istart  : TGtkTextIter;
+  iend    : TGtkTextIter;
+begin
+  GetWidgetBuffer(Rich, PGtkWidget(v), b);
+  gtk_text_buffer_get_iter_at_offset(b, @iStart, TextPos);
+  gtk_text_iter_set_line_offset(@istart, 0);
+  iend := istart;
+  gtk_text_iter_forward_to_line_end(@iend);
+  gtk_text_buffer_delete(b, @istart, @iend);
 end;
 
 class procedure TGtk2WSCustomRichMemo.GetAttributesAt(
