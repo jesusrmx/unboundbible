@@ -205,20 +205,19 @@ begin
       case pn.Style of
         pnNumber:
           begin
+            result := true;
             orgPos := rich.selStart;
             rich.GetParaRange(orgPos, paraRange);
-            remText := rich.GetText(orgPos, paraRange.Start + paraRange.lengthNoBr - orgPos);
-            if remText='' then
-              // de list
-              result := false
-            else begin
-              // split
-              newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
-              rich.GetParaRange(newPos, paraRange);
-              inc(pn.NumberStart);
-              rich.SetParaNumbering(newPos, paraRange.lengthNoBr, pn);
-              result := true;
+            if itemText='' then begin
+              // This line should disappear
+              rich.InDelText('', paraRange.start, Length(bulletText));
+              exit;
             end;
+            remText := rich.GetText(orgPos, paraRange.Start + paraRange.lengthNoBr - orgPos);
+            newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
+            rich.GetParaRange(newPos, paraRange);
+            inc(pn.NumberStart);
+            rich.SetParaNumbering(newPos, 0, pn);
           end;
       end;
   end;
