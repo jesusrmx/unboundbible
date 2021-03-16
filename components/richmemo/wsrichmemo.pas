@@ -51,6 +51,7 @@ type
     class function GetListItem(rich: TCustomRichMemo; out bulletText:string;
       out itemText:string; out pn:TParaNumbering): boolean; virtual;
     class procedure ClearParagraph(rich: TCustomRichMemo; TextPos: Integer); virtual;
+    class procedure RenumberNextListItems(rich: TCustomRichMemo; TextPos:Integer; ANumber: TIntParaNumbering); virtual;
   published
     //Note: RichMemo cannot use LCL TCustomEdit copy/paste/cut operations
     //      because there's no support for (system native) RICHTEXT clipboard format
@@ -168,6 +169,15 @@ begin
 
 end;
 
+class procedure TWSCustomRichMemo.RenumberNextListItems(rich: TCustomRichMemo;
+  TextPos: Integer; ANumber: TIntParaNumbering);
+var
+  s:string;
+begin
+  WriteStr(s, ANumber.Style);
+  WriteLn('Renumbering ', s,' list: starting at ', ANumber.NumberStart);
+end;
+
 class procedure TWSCustomRichMemo.CutToClipboard(const AWinControl: TWinControl); 
 begin
 
@@ -215,14 +225,15 @@ begin
             result := true;
             orgPos := rich.selStart;
             rich.GetParaRange(orgPos, paraRange);
-            if itemText='' then begin
-              ClearParagraph(Rich, orgPos);
-              exit;
+            if itemText='' then
+              ClearParagraph(Rich, orgPos)
+            else begin
+              newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
+              inc(pn.NumberStart);
+              rich.SetParaNumbering(newPos, 0, pn);
+              inc(pn.NumberStart);
             end;
-            newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
-            rich.GetParaRange(newPos, paraRange);
-            inc(pn.NumberStart);
-            rich.SetParaNumbering(newPos, 0, pn);
+            RenumberNextListItems(Rich, newPos, pn);
           end;
       end;
   end;
