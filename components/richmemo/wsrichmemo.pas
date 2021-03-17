@@ -173,9 +173,24 @@ class procedure TWSCustomRichMemo.RenumberNextListItems(rich: TCustomRichMemo;
   TextPos: Integer; ANumber: TIntParaNumbering);
 var
   s:string;
+  rng: TParaRange;
+  Pn: TParaNumbering;
 begin
-  WriteStr(s, ANumber.Style);
-  WriteLn('Renumbering ', s,' list: starting at ', ANumber.NumberStart);
+  if ANumber.Style in [pnNone, pnBullet, pnCustomChar] then
+    exit;
+
+  // Advance to next paragraph
+  GetParaRange(rich, TextPos, rng);
+
+  // limits or current paragraph
+  while rng.LengthNoBr<>rng.Length do begin
+    textPos := rng.start + rng.length; // point to next paragraph
+    GetParaRange(rich, TextPos, rng);
+    if not rich.GetParaNumbering(rng.start, Pn) or (pn.Style<>ANumber.Style) then
+      break;
+    rich.SetParaNumbering(rng.start, rng.lengthNoBr, ANumber);
+    inc(ANumber.NumberStart);
+  end;
 end;
 
 class procedure TWSCustomRichMemo.CutToClipboard(const AWinControl: TWinControl); 
@@ -225,9 +240,10 @@ begin
             result := true;
             orgPos := rich.selStart;
             rich.GetParaRange(orgPos, paraRange);
-            if itemText='' then
-              ClearParagraph(Rich, orgPos)
-            else begin
+            if itemText='' then begin
+              ClearParagraph(Rich, orgPos);
+              newPos := orgPos;
+            end else begin
               newPos := rich.InDelText(LineEnding, orgPos, 0) + orgPos;
               inc(pn.NumberStart);
               rich.SetParaNumbering(newPos, 0, pn);
